@@ -11,7 +11,68 @@ import { Sheet,SheetContent,SheetHeader,SheetTitle,SheetTrigger } from "@/compon
 import { useStore } from "@/state/store";
 import { cn } from "@/lib/utils";
 
-function Filters({category,setCategory}:{category:string;setCategory:(v:string)=>void}){const categoryOptions: string[]=["All",...categories.map(c=>c.name ?? "")];return <div className="space-y-6"><div><b className="text-sm">Category</b><div className="mt-3 grid gap-2">{categoryOptions.map(c=><label key={c} className="flex cursor-pointer items-center gap-2 text-sm"><Checkbox checked={category===c} onCheckedChange={()=>setCategory(c)}/>{c}</label>)}</div></div><div><b className="text-sm">Availability</b><div className="mt-3 grid gap-2">{["In stock","Low stock","Verified sellers"].map(x=><label key={x} className="flex items-center gap-2 text-sm"><Checkbox/>{x}</label>)}</div></div><div><b className="text-sm">Price range</b><div className="mt-3 grid grid-cols-2 gap-2"><Input placeholder="Min ₹"/><Input placeholder="Max ₹"/></div></div><div><b className="text-sm">Minimum rating</b><div className="mt-3 flex gap-2">{[3,4,4.5].map(r=><Button key={r} variant="outline" size="sm"><Star className="fill-warning text-warning"/>{r}+</Button>)}</div></div></div>}
+function Filters({
+  selectedCategories,
+  onToggleCategory,
+}: {
+  selectedCategories: string[];
+  onToggleCategory: (cat: string) => void;
+}) {
+  const categoryOptions: string[] = ["All", ...categories.map((c) => c.name ?? "")];
+  const isAll = selectedCategories.includes("All") || selectedCategories.length === 0;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <b className="text-sm">Category</b>
+        <div className="mt-3 grid gap-2">
+          {categoryOptions.map((c) => {
+            const isChecked = c === "All" ? isAll : selectedCategories.includes(c);
+            return (
+              <label key={c} className="flex cursor-pointer items-center gap-2 text-sm select-none">
+                <Checkbox
+                  checked={isChecked}
+                  onCheckedChange={() => onToggleCategory(c)}
+                />
+                {c}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+      <div>
+        <b className="text-sm">Availability</b>
+        <div className="mt-3 grid gap-2">
+          {["In stock", "Low stock", "Verified sellers"].map((x) => (
+            <label key={x} className="flex cursor-pointer items-center gap-2 text-sm select-none">
+              <Checkbox />
+              {x}
+            </label>
+          ))}
+        </div>
+      </div>
+      <div>
+        <b className="text-sm">Price range</b>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Input placeholder="Min ₹" />
+          <Input placeholder="Max ₹" />
+        </div>
+      </div>
+      <div>
+        <b className="text-sm">Minimum rating</b>
+        <div className="mt-3 flex gap-2">
+          {[3, 4, 4.5].map((r) => (
+            <Button key={r} variant="outline" size="sm">
+              <Star className="fill-warning text-warning" />
+              {r}+
+            </Button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const categoryImages: Record<string, string> = {
   "Grocery & Staples": "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80",
   Beverages: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=1200&q=80",
@@ -24,7 +85,164 @@ export const categoryImages: Record<string, string> = {
   Packaging: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1200&q=80",
   "Health & Wellness": "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=1200&q=80",
 };
-export function ProductsPage({initialCategory="All"}:{initialCategory?:string}){const [search,setSearch]=useState("");const [category,setCategory]=useState(initialCategory);const [sort,setSort]=useState("popular");const [list,setList]=useState(false);const {relationships}=useStore();const connectedProducts=useMemo(()=>products.filter(p=>relationships[p.wholesalerId]==="Connected"),[relationships]);const shown=useMemo(()=>connectedProducts.filter(p=>(category==="All"||p.category===category)&&`${p.name} ${p.brand}`.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>sort==="low"?a.price-b.price:sort==="high"?b.price-a.price:b.rating-a.rating),[connectedProducts,search,category,sort]);return <main className="shell py-8"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase text-primary">Approved wholesale catalogue</p><h1 className="mt-1 text-3xl font-extrabold text-ink">Products</h1><p className="mt-1 text-sm text-muted-foreground">{shown.length} products available from your connected wholesalers</p></div><div className="flex gap-2"><Sheet><SheetTrigger asChild><Button variant="outline" className="lg:hidden"><Tune/> Filters</Button></SheetTrigger><SheetContent side="left"><SheetHeader><SheetTitle>Filter products</SheetTitle></SheetHeader><div className="mt-6 overflow-y-auto"><Filters category={category} setCategory={setCategory}/></div></SheetContent></Sheet><Button aria-label="Grid view" variant={!list?"default":"outline"} size="icon" onClick={()=>setList(false)}><GridView/></Button><Button aria-label="List view" variant={list?"default":"outline"} size="icon" onClick={()=>setList(true)}><List/></Button></div></div><div className="mt-6 flex flex-col gap-3 border-y py-4 sm:flex-row"><Input placeholder="Search your approved catalogue" value={search} onChange={e=>setSearch(e.target.value)} className="sm:max-w-md"/><select value={sort} onChange={e=>setSort(e.target.value)} className="h-9 border bg-background px-3 text-sm sm:ml-auto" aria-label="Sort products"><option value="popular">Most popular</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option></select></div><div className="mt-7 grid gap-8 lg:grid-cols-[220px_1fr]"><aside className="hidden border-r pr-6 lg:block"><Filters category={category} setCategory={setCategory}/></aside>{shown.length?<ProductGrid products={shown} list={list}/>:<div className="border border-dashed bg-card p-10 text-center"><HowToReg className="mx-auto size-10 text-primary"/><h2 className="mt-4 text-xl font-bold text-ink">No approved products match this view</h2><p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Connect with category-specific wholesalers first. Their catalogue will appear here after approval.</p><Button asChild className="mt-5"><Link to="/wholesalers"><Search/> Find wholesalers</Link></Button></div>}</div></main>}
+
+export function ProductsPage({ initialCategory = "All" }: { initialCategory?: string }) {
+  const [search, setSearch] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(() =>
+    initialCategory && initialCategory !== "All" ? [initialCategory] : ["All"]
+  );
+  const [sort, setSort] = useState("popular");
+  const [list, setList] = useState(false);
+  const { relationships } = useStore();
+
+  useEffect(() => {
+    if (initialCategory && initialCategory !== "All") {
+      setSelectedCategories([initialCategory]);
+    }
+  }, [initialCategory]);
+
+  const handleToggleCategory = (cat: string) => {
+    if (cat === "All") {
+      setSelectedCategories(["All"]);
+      return;
+    }
+
+    setSelectedCategories((prev) => {
+      const withoutAll = prev.filter((c) => c !== "All");
+      if (withoutAll.includes(cat)) {
+        const next = withoutAll.filter((c) => c !== cat);
+        return next.length === 0 ? ["All"] : next;
+      } else {
+        return [...withoutAll, cat];
+      }
+    });
+  };
+
+  const connectedProducts = useMemo(
+    () => products.filter((p) => relationships[p.wholesalerId] === "Connected"),
+    [relationships]
+  );
+
+  const isAllSelected =
+    selectedCategories.includes("All") || selectedCategories.length === 0;
+
+  const shown = useMemo(
+    () =>
+      connectedProducts
+        .filter((p) => {
+          const matchesCategory = isAllSelected || selectedCategories.includes(p.category);
+          const matchesSearch =
+            !search ||
+            `${p.name} ${p.brand} ${p.category}`.toLowerCase().includes(search.toLowerCase());
+          return matchesCategory && matchesSearch;
+        })
+        .sort((a, b) =>
+          sort === "low"
+            ? a.price - b.price
+            : sort === "high"
+            ? b.price - a.price
+            : b.rating - a.rating
+        ),
+    [connectedProducts, search, selectedCategories, isAllSelected, sort]
+  );
+
+  return (
+    <main className="shell py-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold uppercase text-primary">Approved wholesale catalogue</p>
+          <h1 className="mt-1 text-3xl font-extrabold text-ink">Products</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {shown.length} product{shown.length === 1 ? "" : "s"} available from your connected wholesalers
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="lg:hidden">
+                <Tune /> Filters
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left">
+              <SheetHeader>
+                <SheetTitle>Filter products</SheetTitle>
+              </SheetHeader>
+              <div className="mt-6 overflow-y-auto">
+                <Filters
+                  selectedCategories={selectedCategories}
+                  onToggleCategory={handleToggleCategory}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          <Button
+            aria-label="Grid view"
+            variant={!list ? "default" : "outline"}
+            size="icon"
+            onClick={() => setList(false)}
+          >
+            <GridView />
+          </Button>
+          <Button
+            aria-label="List view"
+            variant={list ? "default" : "outline"}
+            size="icon"
+            onClick={() => setList(true)}
+          >
+            <List />
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-col gap-3 border-y py-4 sm:flex-row">
+        <Input
+          placeholder="Search your approved catalogue"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="sm:max-w-md"
+        />
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value)}
+          className="h-9 border bg-background px-3 text-sm sm:ml-auto"
+          aria-label="Sort products"
+        >
+          <option value="popular">Most popular</option>
+          <option value="low">Price: low to high</option>
+          <option value="high">Price: high to low</option>
+        </select>
+      </div>
+
+      <div className="mt-7 grid gap-8 lg:grid-cols-[220px_1fr]">
+        <aside className="hidden border-r pr-6 lg:block">
+          <Filters
+            selectedCategories={selectedCategories}
+            onToggleCategory={handleToggleCategory}
+          />
+        </aside>
+
+        {shown.length ? (
+          <ProductGrid products={shown} list={list} />
+        ) : (
+          <div className="border border-dashed bg-card p-10 text-center">
+            <HowToReg className="mx-auto size-10 text-primary" />
+            <h2 className="mt-4 text-xl font-bold text-ink">No approved products match this view</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              Connect with category-specific wholesalers first. Their catalogue will appear here after approval.
+            </p>
+            <Button asChild className="mt-5">
+              <Link to="/wholesalers">
+                <Search /> Find wholesalers
+              </Link>
+            </Button>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
 export function ProductDetailPage({productId}:{productId:string}){const product=getProduct(productId);const w=getWholesaler(product.wholesalerId);const {addToCart,toggleWishlist,wishlist,relationships,addRecentlyViewed}=useStore();useEffect(()=>{if(product?.id)addRecentlyViewed(product.id)},[product?.id,addRecentlyViewed]);const [quantity,setQuantity]=useState(product.moq);const navigate=useNavigate();const saving=Math.round((1-product.price/product.mrp)*100);const orderValue=product.price*quantity;if(relationships[w.id]!=="Connected")return <main className="shell py-16"><div className="mx-auto max-w-xl border bg-card p-8 text-center"><HowToReg className="mx-auto size-12 text-primary"/><h1 className="mt-5 text-2xl font-extrabold text-ink">Connect to unlock this catalogue</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">{w.name} only shares wholesale pricing, stock and product details with approved retailer connections.</p><Button asChild className="mt-6"><Link to="/wholesalers/$wholesalerId" params={{wholesalerId:w.id}}>View {w.name}</Link></Button></div></main>;return <main className="shell py-8"><nav className="mb-6 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><Link to="/products">Products</Link><ChevronRight className="size-3"/><span>{product.category}</span><ChevronRight className="size-3"/><span className="text-foreground">{product.name}</span></nav><div className="grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,.95fr)]"><div><ProductVisual index={product.image} name={product.name} className="aspect-square w-full border bg-card"/><div className="mt-3 grid grid-cols-4 gap-3">{[0,1,2,3].map(i=><ProductVisual key={i} index={(product.image+i)%6} name={`${product.name} view ${i+1}`} className={cn("aspect-square border bg-card",i===0&&"border-primary ring-1 ring-primary")}/>)}</div></div><div><div className="flex flex-wrap items-center gap-2"><Verified className="size-4 text-primary"/><span className="text-sm font-bold text-primary">{product.brand}</span><span className="text-sm text-muted-foreground">in {product.category}</span></div><h1 className="mt-3 text-3xl font-extrabold text-ink sm:text-4xl">{product.name}</h1><div className="mt-3 flex flex-wrap items-center gap-3 text-sm"><span className="flex items-center gap-1 font-bold"><Star className="size-4 fill-warning text-warning"/>{product.rating}</span><span className="text-muted-foreground">128 verified retailer ratings</span><span className="text-success">{product.stock} units ready</span></div><div className="mt-7 border-y py-6"><div className="flex flex-wrap items-baseline gap-3"><strong className="text-3xl text-ink">{money(product.price)}</strong><span className="text-sm text-muted-foreground">per unit</span><span className="text-muted-foreground line-through">MRP {money(product.mrp)}</span><Badge className="bg-success text-success-foreground">Save {saving}%</Badge></div><p className="mt-2 text-xs text-muted-foreground">Wholesale price inclusive of applicable taxes. Final invoice issued by {w.name}.</p></div><div className="mt-5 grid grid-cols-3 gap-2 text-sm"><div className="border bg-card p-3"><Inventory2 className="mb-2 size-4 text-primary"/><b className="block">MOQ</b><span className="text-muted-foreground">{product.moq} units</span></div><div className="border bg-card p-3"><Inventory className="mb-2 size-4 text-success"/><b className="block">Availability</b><span className="text-success">In stock</span></div><div className="border bg-card p-3"><Schedule className="mb-2 size-4 text-primary"/><b className="block">Dispatch</b><span className="text-muted-foreground">Within 24h</span></div></div><div className="mt-6 flex flex-wrap items-end justify-between gap-4"><div><label className="text-sm font-bold">Order quantity</label><div className="mt-2 flex h-11 w-fit items-center border bg-card"><Button aria-label="Decrease quantity" variant="ghost" size="icon" onClick={()=>setQuantity(q=>Math.max(product.moq,q-1))}><Remove/></Button><span className="w-16 text-center font-bold">{quantity}</span><Button aria-label="Increase quantity" variant="ghost" size="icon" onClick={()=>setQuantity(q=>q+1)}><Add/></Button></div><p className="mt-2 text-xs text-muted-foreground">Minimum {product.moq} units</p></div><div className="text-right"><p className="text-xs text-muted-foreground">Order value</p><strong className="text-xl text-ink">{money(orderValue)}</strong></div></div><div className="mt-6 grid grid-cols-2 gap-3"><Button size="lg" onClick={()=>addToCart(product.id,quantity)}>Add to cart</Button><Button size="lg" variant="outline" onClick={()=>{addToCart(product.id,quantity);navigate({to:"/checkout"})}}>Buy now</Button></div><Button variant="ghost" className="mt-2 w-full" onClick={()=>toggleWishlist(product.id)}>{wishlist.includes(product.id)?"Remove from":"Save to"} wishlist</Button><div className="mt-5 border bg-canvas p-5"><div className="flex items-center gap-3"><span className="grid size-12 place-items-center bg-ink font-extrabold text-primary-foreground">{w.initials}</span><div className="min-w-0 flex-1"><Link to="/wholesalers/$wholesalerId" params={{wholesalerId:w.id}} className="flex items-center gap-1 font-bold text-ink hover:text-primary">{w.name}<Verified className="size-4 text-primary"/></Link><p className="mt-1 text-xs text-muted-foreground">{w.rating} rating · {w.location}</p></div><StatusBadge status="Connected"/></div><div className="mt-4 grid grid-cols-2 gap-3 border-t pt-4 text-xs"><span className="flex gap-2"><VerifiedUser className="size-4 text-success"/>Verified business</span><span className="flex gap-2"><LocalShipping className="size-4 text-success"/>{w.delivery}</span></div></div></div></div><section className="mt-14 grid gap-10 lg:grid-cols-[1fr_360px]"><div><h2 className="section-title">Product information</h2><p className="mt-4 leading-7 text-muted-foreground">{product.description}</p><div className="mt-6 divide-y border bg-card">{Object.entries(product.specs).map(([k,v])=><div key={k} className="grid grid-cols-2 gap-4 p-4 text-sm"><span className="text-muted-foreground">{k}</span><b>{v}</b></div>)}</div></div><aside className="border bg-card p-6"><h2 className="text-xl font-bold text-ink">Trade assurance</h2><div className="mt-5 space-y-5">{[[VerifiedUser,"Verified source","Business credentials checked"],[Inventory,"Quality ready","Retail-ready packaging"],[LocalShipping,"Reliable fulfilment",w.delivery],[HeadsetMic,"Retailer support","Order assistance available"]].map(([Icon,title,body])=><div key={String(title)} className="flex gap-3"><span className="grid size-9 shrink-0 place-items-center bg-success/10 text-success"><Icon className="size-4"/></span><div><b className="text-sm">{String(title)}</b><p className="mt-1 text-xs text-muted-foreground">{String(body)}</p></div></div>)}</div></aside></section><section className="mt-14"><SectionHeading title="More from this category" subtitle="Available from your connected wholesale network"/><ProductGrid products={products.filter(p=>p.category===product.category&&p.id!==product.id&&relationships[p.wholesalerId]==="Connected").slice(0,4)}/></section></main>}
 export function CategoriesPage() {
   const totalProducts = categories.reduce((total, category) => total + category.count, 0);
