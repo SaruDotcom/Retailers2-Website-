@@ -13,7 +13,7 @@ export type UserSession = {
 export type UserData = {
   linkedWholesalerId: string;
   profile: RetailerProfile;
-  relationships: Record<string, Relationship>;
+  relationships: Record<string, "Connected">;
   orders: Order[];
   cart: CartLine[];
   wishlist: string[];
@@ -26,23 +26,23 @@ export type Store = {
   isLoggedIn: boolean;
   linkedWholesalerId: string;
   linkedWholesaler: Wholesaler;
+  connectedWholesalers: Wholesaler[];
   cart: CartLine[];
   wishlist: string[];
-  relationships: Record<string, Relationship>;
+  relationships: Record<string, "Connected">;
   orders: Order[];
   retailerProfile: RetailerProfile;
   unread: number;
   notifications: NotificationItem[];
   recentlyViewed: string[];
-  login: (email: string, password?: string) => void;
+  login: (email: string, password?: string, targetWholesalerId?: string) => void;
   logout: () => void;
+  connectWholesaler: (wholesalerId: string, showToast?: boolean) => void;
   registerWithWholesaler: (profile: RetailerProfile, wholesalerId: string) => void;
   addToCart: (id: string, q?: number) => void;
   setQuantity: (id: string, q: number) => void;
   removeCart: (id: string) => void;
   toggleWishlist: (id: string) => void;
-  requestAccess: (id: string) => void;
-  approveRequest: (id: string) => void;
   saveProfile: (profile: RetailerProfile) => void;
   placeOrder: () => Order[];
   markRead: () => void;
@@ -75,10 +75,6 @@ const userATemplate: UserData = {
     gupta: "Connected",
     paperlane: "Connected",
     metro: "Connected",
-    orbit: "Request Pending",
-    northstar: "Request Pending",
-    sunrise: "Request Access",
-    greenway: "Request Access",
   },
   orders: initialOrders,
   cart: [
@@ -90,7 +86,7 @@ const userATemplate: UserData = {
   recentlyViewed: ["p2", "p7", "p11", "p6"],
   notifications: [
     { id: "n1", title: "Order NX-240902 has shipped", body: "Gupta Wholesale Co. expects delivery by 20 Sep.", time: "12 min ago", unread: true },
-    { id: "n2", title: "Access request approved", body: "You can now shop the full Paperlane Supply House catalogue.", time: "2 hours ago", unread: true },
+    { id: "n2", title: "Connected with Paperlane Supply", body: "You can now shop the full Paperlane Supply House catalogue.", time: "2 hours ago", unread: true },
     { id: "n3", title: "Price drop on your wishlist", body: "Classic Electric Kettle is now ₹899 per unit.", time: "Yesterday", unread: true },
     { id: "n4", title: "Order delivered", body: "Your Metro Cash Network order was delivered successfully.", time: "2 days ago", unread: false },
   ],
@@ -117,12 +113,6 @@ const userBTemplate: UserData = {
   relationships: {
     orbit: "Connected",
     sunrise: "Connected",
-    greenway: "Request Pending",
-    sharma: "Request Access",
-    gupta: "Request Access",
-    paperlane: "Request Access",
-    metro: "Request Access",
-    northstar: "Request Access",
   },
   orders: [
     {
@@ -171,10 +161,6 @@ function getNewUserTemplate(email: string, profileInput?: Partial<RetailerProfil
   const wId = resolveWholesalerId(targetWholesalerId);
   const wObj = getWholesaler(wId);
 
-  const relationshipsMap = Object.fromEntries(
-    wholesalers.map((w) => [w.id, w.id === wId ? ("Connected" as Relationship) : ("Request Access" as Relationship)])
-  );
-
   return {
     linkedWholesalerId: wId,
     profile: {
@@ -191,7 +177,9 @@ function getNewUserTemplate(email: string, profileInput?: Partial<RetailerProfil
       state: profileInput?.state || "Delhi",
       pincode: profileInput?.pincode || "110001",
     },
-    relationships: relationshipsMap,
+    relationships: {
+      [wId]: "Connected",
+    },
     orders: [],
     cart: [],
     wishlist: [],
@@ -199,7 +187,7 @@ function getNewUserTemplate(email: string, profileInput?: Partial<RetailerProfil
     notifications: [
       {
         id: "new1",
-        title: `Welcome! Connected to ${wObj.name}`,
+        title: `Welcome! Connected with ${wObj.name}`,
         body: `You have direct wholesale trade access to ${wObj.name}. Start exploring trade products now.`,
         time: "Just now",
         unread: true,
@@ -242,7 +230,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return resolveUserTemplate(activeUserId, currentUser?.email || "amit@kapoorgeneral.example");
   });
 
-  // Load user data whenever activeUserId changes
+  // Sync current user data to localStorage
+  useEffect(() => {
+    if (!activeUserId) return;
+    window.localStorage.setItem(`nexora-user-data_${activeUserId}`, JSON.stringify(userData));
+  }, [activeUserId, userData]);
+
   const switchUser = (userId: string, email: string, profileInput?: Partial<RetailerProfile>) => {
     let resolved = resolveUserTemplate(userId, email);
     if (profileInput) {
@@ -257,15 +250,58 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(`nexora-user-data_${userId}`, JSON.stringify(resolved));
   };
 
-  // Sync current user data to localStorage
-  useEffect(() => {
-    if (!activeUserId) return;
-    window.localStorage.setItem(`nexora-user-data_${activeUserId}`, JSON.stringify(userData));
-  }, [activeUserId, userData]);
-
   const { cart, wishlist, relationships, orders, profile: retailerProfile, recentlyViewed, notifications, linkedWholesalerId = "sharma" } = userData;
 
   const linkedWholesaler = useMemo(() => getWholesaler(linkedWholesalerId), [linkedWholesalerId]);
+
+  const connectedWholesalers = useMemo(() => {
+    return wholesalers.filter((w) => relationships[w.id] === "Connected");
+  }, [relationships]);
+
+  const connectWholesaler = (wholesalerId: string, showToast = true) => {
+    const targetWId = resolveWholesalerId(wholesalerId);
+    const wObj = getWholesaler(targetWId);
+
+    setUserData((prev) => {
+      if (prev.relationships[targetWId] === "Connected") {
+        return { ...prev, linkedWholesalerId: targetWId };
+      }
+      const nextRelationships = { ...prev.relationships, [targetWId]: "Connected" as const };
+      const nextNotifications: NotificationItem[] = [
+        {
+          id: `conn-${Date.now()}`,
+          title: `Connected with ${wObj.name}`,
+          body: `You now have direct wholesale trade access to ${wObj.name}.`,
+          time: "Just now",
+          unread: true,
+        },
+        ...prev.notifications,
+      ];
+      return {
+        ...prev,
+        relationships: nextRelationships,
+        notifications: nextNotifications,
+        linkedWholesalerId: targetWId,
+      };
+    });
+
+    if (showToast) {
+      toast.success(`You're now connected with ${wObj.name}`);
+    }
+  };
+
+  // Auto-connect if URL contains ?wholesaler=... when logged in
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const wParam = params.get("wholesaler") || params.get("w");
+    if (wParam && currentUser && !activeUserId.startsWith("guest-")) {
+      const targetId = resolveWholesalerId(wParam);
+      if (relationships[targetId] !== "Connected") {
+        connectWholesaler(targetId, true);
+      }
+    }
+  }, [activeUserId, currentUser, relationships]);
 
   const setCart = (updater: CartLine[] | ((prev: CartLine[]) => CartLine[])) => {
     setUserData((prev) => ({
@@ -281,24 +317,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }));
   };
 
-  const setRelationships = (updater: Record<string, Relationship> | ((prev: Record<string, Relationship>) => Record<string, Relationship>)) => {
-    setUserData((prev) => ({
-      ...prev,
-      relationships: typeof updater === "function" ? updater(prev.relationships) : updater,
-    }));
-  };
-
   const setOrders = (updater: Order[] | ((prev: Order[]) => Order[])) => {
     setUserData((prev) => ({
       ...prev,
       orders: typeof updater === "function" ? updater(prev.orders) : updater,
-    }));
-  };
-
-  const setProfile = (newProfile: RetailerProfile) => {
-    setUserData((prev) => ({
-      ...prev,
-      profile: newProfile,
     }));
   };
 
@@ -318,7 +340,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const unread = notifications.filter((n) => n.unread).length;
 
-  const login = (email: string) => {
+  const login = (email: string, _password?: string, targetWholesalerId?: string) => {
     const cleanEmail = email.trim().toLowerCase();
     let userId = `user-${cleanEmail.replace(/[^a-z0-9]/g, "")}`;
     if (cleanEmail.includes("amit")) userId = "user-amit";
@@ -327,6 +349,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     switchUser(userId, cleanEmail);
     const resolved = resolveUserTemplate(userId, cleanEmail);
     toast.success(`Signed in as ${resolved.profile.ownerName}`);
+
+    if (targetWholesalerId) {
+      connectWholesaler(targetWholesalerId, true);
+    }
   };
 
   const logout = () => {
@@ -362,7 +388,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(`nexora-user-data_${userId}`, JSON.stringify(newTemplate));
 
     const wObj = getWholesaler(targetWId);
-    toast.success(`Registered & connected to ${wObj.name}`);
+    toast.success(`Registered & connected with ${wObj.name}`);
   };
 
   const value = useMemo<Store>(
@@ -371,6 +397,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       isLoggedIn: currentUser !== null && !activeUserId.startsWith("guest-"),
       linkedWholesalerId,
       linkedWholesaler,
+      connectedWholesalers,
       cart,
       wishlist,
       relationships,
@@ -381,6 +408,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       recentlyViewed,
       login,
       logout,
+      connectWholesaler,
       registerWithWholesaler,
       addToCart: (id, q) => {
         const p = products.find((x) => x.id === id);
@@ -400,14 +428,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       removeCart: (id) => setCart((c) => c.filter((x) => x.productId !== id)),
       toggleWishlist: (id) => setWishlist((w) => (w.includes(id) ? w.filter((x) => x !== id) : [...w, id])),
-      requestAccess: (id) => {
-        setRelationships((r) => ({ ...r, [id]: "Request Pending" }));
-        toast.success("Access request sent");
-      },
-      approveRequest: (id) => {
-        setRelationships((r) => ({ ...r, [id]: "Connected" }));
-        toast.success("Wholesaler connection approved");
-      },
       saveProfile,
       placeOrder: () => {
         const grouped = cart.reduce<Record<string, CartLine[]>>((result, line) => {
@@ -439,7 +459,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setRecentlyViewed((prev) => [id, ...prev.filter((x) => x !== id)].slice(0, 12));
       },
     }),
-    [currentUser, activeUserId, linkedWholesalerId, linkedWholesaler, cart, wishlist, relationships, orders, retailerProfile, unread, notifications, recentlyViewed]
+    [currentUser, activeUserId, linkedWholesalerId, linkedWholesaler, connectedWholesalers, cart, wishlist, relationships, orders, retailerProfile, unread, notifications, recentlyViewed]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

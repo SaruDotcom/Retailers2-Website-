@@ -177,12 +177,12 @@ export function ProductGrid({ products, list = false, premium = false }: { produ
 }
 
 export function WholesalerCard({ wholesaler, premium = false }: { wholesaler: Wholesaler; premium?: boolean }) {
-  const { relationships, requestAccess } = useStore();
-  const state = relationships[wholesaler.id] ?? wholesaler.relationship;
+  const { relationships } = useStore();
+  const isConnected = relationships[wholesaler.id] === "Connected";
   if (!premium)
     return (
-      <article className="group flex h-full flex-col border bg-card p-5 interactive">
-        <div className="grid size-14 place-items-center bg-ink text-lg font-extrabold text-primary-foreground">{wholesaler.initials}</div>
+      <article className="group flex h-full flex-col border bg-card p-5 interactive rounded-2xl">
+        <div className="grid size-14 place-items-center bg-ink text-lg font-extrabold text-primary-foreground rounded-xl">{wholesaler.initials}</div>
         <Link to="/wholesalers/$wholesalerId" params={{ wholesalerId: wholesaler.id }} className="mt-5 flex items-center gap-1 text-lg font-extrabold text-ink group-hover:text-primary">
           {wholesaler.name}
           {wholesaler.verified && <Verified className="size-5 text-primary" />}
@@ -214,23 +214,13 @@ export function WholesalerCard({ wholesaler, premium = false }: { wholesaler: Wh
           </span>
         </div>
         <div className="mt-auto flex gap-2 pt-5">
-          {state === "Connected" ? (
-            <Button asChild variant="outline" className="flex-1">
-              <Link to="/wholesalers/$wholesalerId" params={{ wholesalerId: wholesaler.id }}>
-                Browse Catalog
-              </Link>
-            </Button>
-          ) : state === "Request Access" ? (
-            <Button className="flex-1" onClick={() => requestAccess(wholesaler.id)}>
-              Request Connection
-            </Button>
-          ) : (
-            <Button variant="secondary" disabled className="flex-1 opacity-80 cursor-not-allowed">
-              Request Pending
-            </Button>
-          )}
-          {state === "Connected" && (
-            <span className="grid size-9 shrink-0 place-items-center bg-success/10 text-success" title="Verified connection">
+          <Button asChild variant="outline" className="flex-1 rounded-xl">
+            <Link to="/wholesalers/$wholesalerId" params={{ wholesalerId: wholesaler.id }}>
+              Browse Catalog
+            </Link>
+          </Button>
+          {isConnected && (
+            <span className="grid size-9 shrink-0 place-items-center bg-success/10 text-success rounded-xl" title="Connected Wholesaler">
               <VerifiedUser className="size-4" />
             </span>
           )}
@@ -282,23 +272,13 @@ export function WholesalerCard({ wholesaler, premium = false }: { wholesaler: Wh
         </span>
       </div>
       <div className="mt-auto flex items-center gap-2 pt-6">
-        {state === "Connected" ? (
-          <Button asChild variant="outline" className="flex-1 rounded-xl border-primary/35 text-primary transition-colors hover:bg-primary hover:text-primary-foreground">
-            <Link to="/wholesalers/$wholesalerId" params={{ wholesalerId: wholesaler.id }}>
-              Browse Catalog <ArrowRight />
-            </Link>
-          </Button>
-        ) : state === "Request Access" ? (
-          <Button className="flex-1 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => requestAccess(wholesaler.id)}>
-            Request Connection
-          </Button>
-        ) : (
-          <Button variant="secondary" disabled className="flex-1 rounded-xl opacity-80 cursor-not-allowed">
-            Request Pending
-          </Button>
-        )}
-        {state === "Connected" && (
-          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-success/10 text-success" title="Verified Partner">
+        <Button asChild variant="outline" className="flex-1 rounded-xl border-primary/35 text-primary transition-colors hover:bg-primary hover:text-primary-foreground">
+          <Link to="/wholesalers/$wholesalerId" params={{ wholesalerId: wholesaler.id }}>
+            Browse Catalog <ArrowRight className="size-4" />
+          </Link>
+        </Button>
+        {isConnected && (
+          <span className="grid size-9 shrink-0 place-items-center bg-success/10 text-success rounded-xl" title="Connected Wholesaler">
             <VerifiedUser className="size-4" />
           </span>
         )}
