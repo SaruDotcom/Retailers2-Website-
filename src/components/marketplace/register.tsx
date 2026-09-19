@@ -17,10 +17,73 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
 import { categories, type RetailerProfile } from "@/data/mock";
 import { useStore } from "@/state/store";
+
+const termsContent = {
+  title: "NEXORA Terms of Service",
+  subtitle: "Standard Retailer Agreement & Platform Terms (Effective September 2026)",
+  sections: [
+    {
+      title: "1. Introduction",
+      body: "Welcome to NEXORA, India's retailer-first wholesale marketplace. By registering a retailer account on NEXORA, you agree to comply with and be bound by these Terms of Service governing access to supplier catalogues, trade pricing, and order placement."
+    },
+    {
+      title: "2. Account Responsibilities & Registration",
+      body: "Retailers must provide accurate business details, including business name, owner contact information, and GSTIN (if registered). You are solely responsible for maintaining the confidentiality of your account credentials and for all activities conducted under your account."
+    },
+    {
+      title: "3. Data & Privacy Protection",
+      body: "Your store information and contact details are treated with strict confidentiality. Business details are shared with wholesalers only upon explicit connection requests initiated by you. NEXORA complies with applicable data protection guidelines."
+    },
+    {
+      title: "4. Order & Payment Terms",
+      body: "All wholesale purchase orders submitted through NEXORA are subject to acceptance and fulfillment by the respective verified wholesaler. Payment terms (Cash on Delivery, Credit, or Direct Bank Transfer) are agreed upon per supplier contract."
+    },
+    {
+      title: "5. Account Termination & Suspension",
+      body: "NEXORA reserves the right to suspend or terminate retailer access in the event of fraudulent activities, submission of false documentation, or breach of agreed wholesale trade terms."
+    }
+  ]
+};
+
+const policyContent = {
+  title: "NEXORA Retailer Policy & Trade Guidelines",
+  subtitle: "Marketplace Rules & Supplier Engagement Standards (Effective September 2026)",
+  sections: [
+    {
+      title: "1. Overview & Purpose",
+      body: "This Retailer Policy outlines the standards of conduct required of all retail businesses operating on NEXORA. Our mission is to facilitate seamless, reliable, and fair trade between independent retailers and verified manufacturers or distributors."
+    },
+    {
+      title: "2. Supplier Connection Requests",
+      body: "Connection requests must be made with legitimate commercial interest. Access to wholesale trade pricing is granted only after the wholesaler reviews and approves your retailer connection request."
+    },
+    {
+      title: "3. Order Fulfilment & Logistics",
+      body: "Orders placed on NEXORA are processed and dispatched directly by individual wholesalers. Delivery timelines, minimum order quantities (MOQ), and shipping charges are determined by supplier policies."
+    },
+    {
+      title: "4. Damaged Goods & Return Protocol",
+      body: "Retailers must inspect delivered inventory upon receipt. Any discrepancies, broken seals, or damaged stock must be reported to the supplier within 48 hours for replacement or credit note issuance."
+    },
+    {
+      title: "5. Policy Compliance & Confidentiality",
+      body: "Wholesale prices and catalog details accessed on NEXORA are confidential B2B trade rates. Unauthorised disclosure or public redistribution of wholesale pricing is strictly prohibited."
+    }
+  ]
+};
 
 type Fields = RetailerProfile & { password: string; confirmPassword: string };
 type Errors = Partial<Record<keyof Fields | "terms", string>>;
@@ -120,6 +183,14 @@ export function RegisterPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [done, setDone] = useState(false);
+  const [policyModal, setPolicyModal] = useState<"terms" | "policy" | null>(null);
+
+  const handleTermsChange = (checked: boolean) => {
+    setTerms(checked);
+    if (checked) {
+      setErrors((prev) => ({ ...prev, terms: undefined }));
+    }
+  };
 
   const set = <K extends keyof Fields>(key: K, value: Fields[K]) => {
     setFields((f) => ({ ...f, [key]: value }));
@@ -299,15 +370,50 @@ export function RegisterPage() {
 
           {/* Terms + submit */}
           <div className="grid gap-4 border-t pt-6">
-            {currentStep === 4 && <>
-              <label className="flex items-start gap-3 text-sm text-muted-foreground">
-                <Checkbox checked={terms} onCheckedChange={(v) => setTerms(v === true)} className="mt-0.5" />
-                <span>
-                  I accept the <span className="font-semibold text-primary">Terms of Service</span> and <span className="font-semibold text-primary">Retailer Policy</span>, and confirm that the provided business details are accurate.
-                </span>
-              </label>
-              {errors.terms && <p className="text-xs font-medium text-destructive">{errors.terms}</p>}
-            </>}
+            {currentStep === 4 && (
+              <>
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="terms-checkbox"
+                    checked={terms}
+                    onCheckedChange={handleTermsChange}
+                    onChange={(e) => handleTermsChange(e.target.checked)}
+                    className="mt-0.5 shrink-0"
+                  />
+                  <label
+                    htmlFor="terms-checkbox"
+                    className="cursor-pointer select-none text-sm text-muted-foreground leading-snug"
+                  >
+                    I accept the{" "}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setPolicyModal("terms");
+                      }}
+                      className="font-bold text-primary underline underline-offset-2 hover:text-primary/80 focus:outline-none"
+                    >
+                      Terms of Service
+                    </button>{" "}
+                    and{" "}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setPolicyModal("policy");
+                      }}
+                      className="font-bold text-primary underline underline-offset-2 hover:text-primary/80 focus:outline-none"
+                    >
+                      Retailer Policy
+                    </button>
+                    , and confirm that the provided business details are accurate.
+                  </label>
+                </div>
+                {errors.terms && <p className="text-xs font-medium text-destructive">{errors.terms}</p>}
+              </>
+            )}
             <Button type="submit" size="lg" className="w-full">
               <VerifiedUser className="size-4" /> {currentStep === 4 ? "Create retailer account" : "Continue"}
             </Button>
@@ -323,6 +429,58 @@ export function RegisterPage() {
           </Link>
         </p>
       </section>
+
+      {/* Terms / Policy Modal */}
+      <Dialog open={policyModal !== null} onOpenChange={(open) => !open && setPolicyModal(null)}>
+        <DialogContent className="max-w-xl max-h-[85vh] flex flex-col p-6">
+          {policyModal && (
+            <>
+              <DialogHeader className="pb-3 border-b">
+                <DialogTitle className="text-xl font-black text-ink">
+                  {policyModal === "terms" ? termsContent.title : policyContent.title}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-1">
+                  {policyModal === "terms" ? termsContent.subtitle : policyContent.subtitle}
+                </DialogDescription>
+              </DialogHeader>
+
+              <ScrollArea className="flex-1 my-4 pr-3 max-h-[55vh]">
+                <div className="space-y-5 text-sm">
+                  {(policyModal === "terms" ? termsContent.sections : policyContent.sections).map((sec) => (
+                    <div key={sec.title} className="space-y-1.5">
+                      <h4 className="font-extrabold text-ink text-base">{sec.title}</h4>
+                      <p className="text-muted-foreground leading-relaxed text-xs sm:text-sm">{sec.body}</p>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+
+              <DialogFooter className="pt-3 border-t flex flex-col sm:flex-row gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPolicyModal(null)}
+                  className="rounded-xl font-semibold"
+                >
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    handleTermsChange(true);
+                    setPolicyModal(null);
+                    toast.success(`Accepted ${policyModal === "terms" ? "Terms of Service" : "Retailer Policy"}`);
+                  }}
+                  className="rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90"
+                >
+                  Accept & Close
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
+
