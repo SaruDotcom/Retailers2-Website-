@@ -28,8 +28,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Select from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
-import { categories, type RetailerProfile } from "@/data/mock";
-import { useStore } from "@/state/store";
+import { categories, wholesalers, type RetailerProfile } from "@/data/mock";
+import { useStore, resolveWholesalerId } from "@/state/store";
 
 const termsContent = {
   title: "NEXORA Terms of Service",
@@ -175,7 +175,7 @@ function Section({ icon: Icon, step, title, subtitle }: { icon: React.ElementTyp
 
 export function RegisterPage() {
   const navigate = useNavigate();
-  const { saveProfile } = useStore();
+  const { registerWithWholesaler } = useStore();
   const [fields, setFields] = useState<Fields>(empty);
   const [errors, setErrors] = useState<Errors>({});
   const [terms, setTerms] = useState(false);
@@ -184,6 +184,12 @@ export function RegisterPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [done, setDone] = useState(false);
   const [policyModal, setPolicyModal] = useState<"terms" | "policy" | null>(null);
+
+  // Parse wholesaler param from URL
+  const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+  const wholesalerQuery = searchParams.get("wholesaler") || searchParams.get("w");
+  const targetWholesalerId = resolveWholesalerId(wholesalerQuery);
+  const targetWholesaler = wholesalers.find((w) => w.id === targetWholesalerId) || wholesalers[0];
 
   const handleTermsChange = (checked: boolean) => {
     setTerms(checked);
@@ -212,22 +218,21 @@ export function RegisterPage() {
       return;
     }
     const { password: _pw, confirmPassword: _cpw, ...profile } = fields;
-    saveProfile({ ...profile, gstNumber: profile.gstNumber.toUpperCase() });
+    registerWithWholesaler({ ...profile, gstNumber: profile.gstNumber.toUpperCase() }, targetWholesaler.id);
     setDone(true);
-    toast.success("Account created successfully — Welcome to NEXORA!");
   };
 
   if (done) {
     return (
       <main className="grid min-h-[calc(100vh-120px)] place-items-center bg-canvas px-4 py-12">
-        <section className="w-full max-w-md border bg-card p-8 text-center shadow-sm">
-          <span className="mx-auto grid size-14 place-items-center bg-success/10 text-success"><Verified className="size-8" /></span>
+        <section className="w-full max-w-md border bg-card p-8 text-center shadow-sm rounded-2xl">
+          <span className="mx-auto grid size-14 place-items-center bg-success/10 text-success rounded-full"><Verified className="size-8" /></span>
           <h1 className="mt-5 text-2xl font-extrabold text-ink">Account Ready!</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Retailer account created for <strong className="text-ink">{fields.businessName}</strong>. You can now discover wholesalers by category, send connection requests, and unlock their trade catalogs.
+            Retailer account created for <strong className="text-ink">{fields.businessName}</strong> and linked to <strong className="text-primary font-bold">{targetWholesaler.name}</strong>. You now have instant access to their trade catalogue.
           </p>
           <div className="mt-6 grid gap-2">
-            <Button size="lg" onClick={() => navigate({ to: "/categories" })}>Browse Wholesalers by Category</Button>
+            <Button size="lg" onClick={() => navigate({ to: "/products" })}>Browse {targetWholesaler.name}'s Catalog</Button>
             <Button size="lg" variant="outline" onClick={() => navigate({ to: "/dashboard" })}>Go to Dashboard</Button>
           </div>
         </section>
@@ -238,11 +243,27 @@ export function RegisterPage() {
   return (
     <main className="bg-canvas px-4 py-10">
       <section className="mx-auto w-full max-w-2xl">
+        {/* Direct Wholesaler Link Banner */}
+        <div className="mb-6 rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left shadow-sm">
+          <img src={targetWholesaler.logo} alt={targetWholesaler.name} className="size-14 rounded-full border bg-white object-contain p-1 shadow-xs shrink-0" />
+          <div className="flex-1">
+            <span className="inline-block rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary mb-1">
+              Direct Wholesaler Invite Link
+            </span>
+            <h3 className="text-base font-extrabold text-ink sm:text-lg">
+              Registering for access to {targetWholesaler.name}
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Owner: {targetWholesaler.ownerName} ({targetWholesaler.location}) • Completing registration automatically unlocks trade pricing & instant access.
+            </p>
+          </div>
+        </div>
+
         <div className="text-center">
           <span className="mx-auto grid size-11 place-items-center bg-primary font-extrabold text-primary-foreground">N</span>
           <h1 className="mt-5 text-2xl font-extrabold text-ink sm:text-3xl">Create your retailer account</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Fill in your details to connect with verified wholesalers and start ordering products.
+            Fill in your details to complete registration and unlock wholesale pricing with {targetWholesaler.name}.
           </p>
         </div>
 

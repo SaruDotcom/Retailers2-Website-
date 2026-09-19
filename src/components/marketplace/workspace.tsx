@@ -9,8 +9,8 @@ import { useStore } from "@/state/store";
 import { CartItem, EmptyState, OrderCard, ProductGrid, SectionHeading, StatusBadge } from "./primitives";
 
 export function DashboardPage() {
-  const { wishlist, relationships, orders, retailerProfile } = useStore();
-  const connectedProducts = products.filter((p) => relationships[p.wholesalerId] === "Connected");
+  const { wishlist, orders, retailerProfile, linkedWholesalerId, linkedWholesaler } = useStore();
+  const connectedProducts = products.filter((p) => p.wholesalerId === linkedWholesalerId);
   const firstName = retailerProfile.ownerName.trim().split(" ")[0] || "Retailer";
 
   return (
@@ -19,7 +19,7 @@ export function DashboardPage() {
         <div>
           <p className="text-xs font-bold uppercase text-primary">Retailer workspace</p>
           <h1 className="mt-2 text-3xl font-extrabold text-ink">Good morning, {firstName}</h1>
-          <p className="mt-2 text-muted-foreground">{retailerProfile.businessName} is ready for its next restock.</p>
+          <p className="mt-2 text-muted-foreground">{retailerProfile.businessName} is linked with <strong className="text-ink">{linkedWholesaler.name}</strong>.</p>
         </div>
         <Button asChild><Link to="/products">Continue shopping</Link></Button>
       </div>
@@ -27,12 +27,12 @@ export function DashboardPage() {
         {[
           ["Active orders", orders.filter(o => !["Delivered", "Cancelled"].includes(o.status)).length, "/orders"],
           ["Pending orders", orders.filter(o => o.status === "Pending").length, "/orders"],
-          ["Connected wholesalers", Object.values(relationships).filter(r => r === "Connected").length, "/wholesalers"],
+          ["Linked Supplier", linkedWholesaler.name, "/products"],
           ["Wishlist items", wishlist.length, "/wishlist"],
         ].map(([label, value, to]) => (
-          <Link key={label as string} to={to as "/orders" | "/wholesalers" | "/wishlist"} className="border bg-card p-5 interactive">
-            <span className="text-sm text-muted-foreground">{label}</span>
-            <strong className="mt-2 block text-3xl text-ink">{value}</strong>
+          <Link key={label as string} to={to as "/orders" | "/products" | "/wishlist"} className="border bg-card p-5 interactive rounded-2xl">
+            <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+            <strong className="mt-2 block text-xl sm:text-2xl text-ink font-black truncate">{value}</strong>
           </Link>
         ))}
       </div>
@@ -47,7 +47,7 @@ export function DashboardPage() {
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border/80 p-6 text-center text-sm text-muted-foreground bg-card">
-              No orders placed yet. Connect with wholesalers to start ordering.
+              No orders placed yet. Explore trade products to start ordering.
             </div>
           )}
         </section>
@@ -55,24 +55,24 @@ export function DashboardPage() {
           <SectionHeading title="Quick actions" />
           <div className="grid gap-3">
             {[
-              ["Find wholesalers", "Compare suppliers and grow your network", "/wholesalers"],
+              [`Browse ${linkedWholesaler.name}`, "Shop trade catalog and place bulk orders", "/products"],
               ["Review wishlist", "Return to products you saved", "/wishlist"],
               ["Manage delivery addresses", "Keep your store details ready", "/addresses"],
-            ].map(([title, body, to]) => (
-              <Link key={title} to={to as "/wholesalers" | "/wishlist" | "/addresses"} className="flex items-center justify-between border bg-card p-5 interactive">
+            ].map(([t, d, to]) => (
+              <Link key={t} to={to as "/products" | "/wishlist" | "/addresses"} className="flex items-center justify-between border bg-card p-4 interactive rounded-xl">
                 <div>
-                  <b>{title}</b>
-                  <p className="mt-1 text-sm text-muted-foreground">{body}</p>
+                  <b className="block text-ink text-sm font-extrabold">{t}</b>
+                  <span className="text-xs text-muted-foreground">{d}</span>
                 </div>
-                <ChevronRight className="size-5 text-primary" />
+                <ChevronRight className="size-4 text-primary" />
               </Link>
             ))}
           </div>
         </section>
       </div>
-      <section className="mt-12">
-        <SectionHeading title="Recommended for your store" subtitle="Popular trade-ready products" href="/products" />
-        <ProductGrid products={connectedProducts.length > 0 ? connectedProducts.slice(0, 4) : products.slice(0, 4)} />
+      <section className="mt-14">
+        <SectionHeading title={`Catalogue from ${linkedWholesaler.name}`} subtitle="Direct wholesale trade catalog" href="/products" />
+        <ProductGrid products={connectedProducts.slice(0, 4)} />
       </section>
     </main>
   );

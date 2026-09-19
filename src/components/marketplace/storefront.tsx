@@ -93,7 +93,7 @@ export function ProductsPage({ initialCategory = "All" }: { initialCategory?: st
   );
   const [sort, setSort] = useState("popular");
   const [list, setList] = useState(false);
-  const { relationships } = useStore();
+  const { linkedWholesalerId, linkedWholesaler } = useStore();
 
   useEffect(() => {
     if (initialCategory && initialCategory !== "All") {
@@ -119,8 +119,8 @@ export function ProductsPage({ initialCategory = "All" }: { initialCategory?: st
   };
 
   const connectedProducts = useMemo(
-    () => products.filter((p) => relationships[p.wholesalerId] === "Connected"),
-    [relationships]
+    () => products.filter((p) => p.wholesalerId === linkedWholesalerId),
+    [linkedWholesalerId]
   );
 
   const isAllSelected =
@@ -150,10 +150,10 @@ export function ProductsPage({ initialCategory = "All" }: { initialCategory?: st
     <main className="shell py-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-bold uppercase text-primary">Approved wholesale catalogue</p>
+          <p className="text-xs font-bold uppercase text-primary">Wholesale catalogue from {linkedWholesaler.name}</p>
           <h1 className="mt-1 text-3xl font-extrabold text-ink">Products</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {shown.length} product{shown.length === 1 ? "" : "s"} available from your connected wholesalers
+            {shown.length} product{shown.length === 1 ? "" : "s"} available directly from {linkedWholesaler.name}
           </p>
         </div>
 
@@ -198,7 +198,7 @@ export function ProductsPage({ initialCategory = "All" }: { initialCategory?: st
 
       <div className="mt-6 flex flex-col gap-3 border-y py-4 sm:flex-row">
         <Input
-          placeholder="Search your approved catalogue"
+          placeholder={`Search ${linkedWholesaler.name} catalogue...`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="sm:max-w-md"
@@ -226,16 +226,14 @@ export function ProductsPage({ initialCategory = "All" }: { initialCategory?: st
         {shown.length ? (
           <ProductGrid products={shown} list={list} />
         ) : (
-          <div className="border border-dashed bg-card p-10 text-center">
-            <HowToReg className="mx-auto size-10 text-primary" />
-            <h2 className="mt-4 text-xl font-bold text-ink">No approved products match this view</h2>
+          <div className="border border-dashed bg-card p-10 text-center rounded-2xl">
+            <Inventory2 className="mx-auto size-10 text-primary" />
+            <h2 className="mt-4 text-xl font-bold text-ink">No products match your search or filters</h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-              Connect with category-specific wholesalers first. Their catalogue will appear here after approval.
+              Try selecting a different category or clearing your search query.
             </p>
-            <Button asChild className="mt-5">
-              <Link to="/wholesalers">
-                <Search /> Find wholesalers
-              </Link>
+            <Button className="mt-5 rounded-xl font-bold" onClick={() => { setSearch(""); setSelectedCategories(["All"]); }}>
+              Reset filters
             </Button>
           </div>
         )}
@@ -243,35 +241,38 @@ export function ProductsPage({ initialCategory = "All" }: { initialCategory?: st
     </main>
   );
 }
-export function ProductDetailPage({productId}:{productId:string}){const product=getProduct(productId);const w=getWholesaler(product.wholesalerId);const {addToCart,toggleWishlist,wishlist,relationships,addRecentlyViewed}=useStore();useEffect(()=>{if(product?.id)addRecentlyViewed(product.id)},[product?.id,addRecentlyViewed]);const [quantity,setQuantity]=useState(product.moq);const navigate=useNavigate();const saving=Math.round((1-product.price/product.mrp)*100);const orderValue=product.price*quantity;if(relationships[w.id]!=="Connected")return <main className="shell py-16"><div className="mx-auto max-w-xl border bg-card p-8 text-center"><HowToReg className="mx-auto size-12 text-primary"/><h1 className="mt-5 text-2xl font-extrabold text-ink">Connect to unlock this catalogue</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">{w.name} only shares wholesale pricing, stock and product details with approved retailer connections.</p><Button asChild className="mt-6"><Link to="/wholesalers/$wholesalerId" params={{wholesalerId:w.id}}>View {w.name}</Link></Button></div></main>;return <main className="shell py-8"><nav className="mb-6 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><Link to="/products">Products</Link><ChevronRight className="size-3"/><span>{product.category}</span><ChevronRight className="size-3"/><span className="text-foreground">{product.name}</span></nav><div className="grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,.95fr)]"><div><ProductVisual index={product.image} name={product.name} className="aspect-square w-full border bg-card"/><div className="mt-3 grid grid-cols-4 gap-3">{[0,1,2,3].map(i=><ProductVisual key={i} index={(product.image+i)%6} name={`${product.name} view ${i+1}`} className={cn("aspect-square border bg-card",i===0&&"border-primary ring-1 ring-primary")}/>)}</div></div><div><div className="flex flex-wrap items-center gap-2"><Verified className="size-4 text-primary"/><span className="text-sm font-bold text-primary">{product.brand}</span><span className="text-sm text-muted-foreground">in {product.category}</span></div><h1 className="mt-3 text-3xl font-extrabold text-ink sm:text-4xl">{product.name}</h1><div className="mt-3 flex flex-wrap items-center gap-3 text-sm"><span className="flex items-center gap-1 font-bold"><Star className="size-4 fill-warning text-warning"/>{product.rating}</span><span className="text-muted-foreground">128 verified retailer ratings</span><span className="text-success">{product.stock} units ready</span></div><div className="mt-7 border-y py-6"><div className="flex flex-wrap items-baseline gap-3"><strong className="text-3xl text-ink">{money(product.price)}</strong><span className="text-sm text-muted-foreground">per unit</span><span className="text-muted-foreground line-through">MRP {money(product.mrp)}</span><Badge className="bg-success text-success-foreground">Save {saving}%</Badge></div><p className="mt-2 text-xs text-muted-foreground">Wholesale price inclusive of applicable taxes. Final invoice issued by {w.name}.</p></div><div className="mt-5 grid grid-cols-3 gap-2 text-sm"><div className="border bg-card p-3"><Inventory2 className="mb-2 size-4 text-primary"/><b className="block">MOQ</b><span className="text-muted-foreground">{product.moq} units</span></div><div className="border bg-card p-3"><Inventory className="mb-2 size-4 text-success"/><b className="block">Availability</b><span className="text-success">In stock</span></div><div className="border bg-card p-3"><Schedule className="mb-2 size-4 text-primary"/><b className="block">Dispatch</b><span className="text-muted-foreground">Within 24h</span></div></div><div className="mt-6 flex flex-wrap items-end justify-between gap-4"><div><label className="text-sm font-bold">Order quantity</label><div className="mt-2 flex h-11 w-fit items-center border bg-card"><Button aria-label="Decrease quantity" variant="ghost" size="icon" onClick={()=>setQuantity(q=>Math.max(product.moq,q-1))}><Remove/></Button><span className="w-16 text-center font-bold">{quantity}</span><Button aria-label="Increase quantity" variant="ghost" size="icon" onClick={()=>setQuantity(q=>q+1)}><Add/></Button></div><p className="mt-2 text-xs text-muted-foreground">Minimum {product.moq} units</p></div><div className="text-right"><p className="text-xs text-muted-foreground">Order value</p><strong className="text-xl text-ink">{money(orderValue)}</strong></div></div><div className="mt-6 grid grid-cols-2 gap-3"><Button size="lg" onClick={()=>addToCart(product.id,quantity)}>Add to cart</Button><Button size="lg" variant="outline" onClick={()=>{addToCart(product.id,quantity);navigate({to:"/checkout"})}}>Buy now</Button></div><Button variant="ghost" className="mt-2 w-full" onClick={()=>toggleWishlist(product.id)}>{wishlist.includes(product.id)?"Remove from":"Save to"} wishlist</Button><div className="mt-5 border bg-canvas p-5"><div className="flex items-center gap-3"><span className="grid size-12 place-items-center bg-ink font-extrabold text-primary-foreground">{w.initials}</span><div className="min-w-0 flex-1"><Link to="/wholesalers/$wholesalerId" params={{wholesalerId:w.id}} className="flex items-center gap-1 font-bold text-ink hover:text-primary">{w.name}<Verified className="size-4 text-primary"/></Link><p className="mt-1 text-xs text-muted-foreground">{w.rating} rating · {w.location}</p></div><StatusBadge status="Connected"/></div><div className="mt-4 grid grid-cols-2 gap-3 border-t pt-4 text-xs"><span className="flex gap-2"><VerifiedUser className="size-4 text-success"/>Verified business</span><span className="flex gap-2"><LocalShipping className="size-4 text-success"/>{w.delivery}</span></div></div></div></div><section className="mt-14 grid gap-10 lg:grid-cols-[1fr_360px]"><div><h2 className="section-title">Product information</h2><p className="mt-4 leading-7 text-muted-foreground">{product.description}</p><div className="mt-6 divide-y border bg-card">{Object.entries(product.specs).map(([k,v])=><div key={k} className="grid grid-cols-2 gap-4 p-4 text-sm"><span className="text-muted-foreground">{k}</span><b>{v}</b></div>)}</div></div><aside className="border bg-card p-6"><h2 className="text-xl font-bold text-ink">Trade assurance</h2><div className="mt-5 space-y-5">{[[VerifiedUser,"Verified source","Business credentials checked"],[Inventory,"Quality ready","Retail-ready packaging"],[LocalShipping,"Reliable fulfilment",w.delivery],[HeadsetMic,"Retailer support","Order assistance available"]].map(([Icon,title,body])=><div key={String(title)} className="flex gap-3"><span className="grid size-9 shrink-0 place-items-center bg-success/10 text-success"><Icon className="size-4"/></span><div><b className="text-sm">{String(title)}</b><p className="mt-1 text-xs text-muted-foreground">{String(body)}</p></div></div>)}</div></aside></section><section className="mt-14"><SectionHeading title="More from this category" subtitle="Available from your connected wholesale network"/><ProductGrid products={products.filter(p=>p.category===product.category&&p.id!==product.id&&relationships[p.wholesalerId]==="Connected").slice(0,4)}/></section></main>}
+export function ProductDetailPage({productId}:{productId:string}){const product=getProduct(productId);const w=getWholesaler(product.wholesalerId);const {addToCart,toggleWishlist,wishlist,linkedWholesalerId,addRecentlyViewed}=useStore();useEffect(()=>{if(product?.id)addRecentlyViewed(product.id)},[product?.id,addRecentlyViewed]);const [quantity,setQuantity]=useState(product.moq);const navigate=useNavigate();const saving=Math.round((1-product.price/product.mrp)*100);const orderValue=product.price*quantity;if(product.wholesalerId!==linkedWholesalerId)return <main className="shell py-16"><div className="mx-auto max-w-xl border bg-card p-8 text-center rounded-2xl"><HowToReg className="mx-auto size-12 text-primary"/><h1 className="mt-5 text-2xl font-extrabold text-ink">Product not in your store catalogue</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">Your store is exclusively linked to your designated wholesaler. Browse available products in your store catalogue.</p><Button asChild className="mt-6 font-bold rounded-xl"><Link to="/products">Browse store products</Link></Button></div></main>;return <main className="shell py-8"><nav className="mb-6 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><Link to="/products">Products</Link><ChevronRight className="size-3"/><span>{product.category}</span><ChevronRight className="size-3"/><span className="text-foreground">{product.name}</span></nav><div className="grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,.95fr)]"><div><ProductVisual index={product.image} name={product.name} className="aspect-square w-full border bg-card"/><div className="mt-3 grid grid-cols-4 gap-3">{[0,1,2,3].map(i=><ProductVisual key={i} index={(product.image+i)%6} name={`${product.name} view ${i+1}`} className={cn("aspect-square border bg-card",i===0&&"border-primary ring-1 ring-primary")}/>)}</div></div><div><div className="flex flex-wrap items-center gap-2"><Verified className="size-4 text-primary"/><span className="text-sm font-bold text-primary">{product.brand}</span><span className="text-sm text-muted-foreground">in {product.category}</span></div><h1 className="mt-3 text-3xl font-extrabold text-ink sm:text-4xl">{product.name}</h1><div className="mt-3 flex flex-wrap items-center gap-3 text-sm"><span className="flex items-center gap-1 font-bold"><Star className="size-4 fill-warning text-warning"/>{product.rating}</span><span className="text-muted-foreground">128 verified retailer ratings</span><span className="text-success">{product.stock} units ready</span></div><div className="mt-7 border-y py-6"><div className="flex flex-wrap items-baseline gap-3"><strong className="text-3xl text-ink">{money(product.price)}</strong><span className="text-sm text-muted-foreground">per unit</span><span className="text-muted-foreground line-through">MRP {money(product.mrp)}</span><Badge className="bg-success text-success-foreground">Save {saving}%</Badge></div><p className="mt-2 text-xs text-muted-foreground">Wholesale price inclusive of applicable taxes. Final invoice issued by {w.name}.</p></div><div className="mt-5 grid grid-cols-3 gap-2 text-sm"><div className="border bg-card p-3"><Inventory2 className="mb-2 size-4 text-primary"/><b className="block">MOQ</b><span className="text-muted-foreground">{product.moq} units</span></div><div className="border bg-card p-3"><Inventory className="mb-2 size-4 text-success"/><b className="block">Availability</b><span className="text-success">In stock</span></div><div className="border bg-card p-3"><Schedule className="mb-2 size-4 text-primary"/><b className="block">Dispatch</b><span className="text-muted-foreground">Within 24h</span></div></div><div className="mt-6 flex flex-wrap items-end justify-between gap-4"><div><label className="text-sm font-bold">Order quantity</label><div className="mt-2 flex h-11 w-fit items-center border bg-card"><Button aria-label="Decrease quantity" variant="ghost" size="icon" onClick={()=>setQuantity(q=>Math.max(product.moq,q-1))}><Remove/></Button><span className="w-16 text-center font-bold">{quantity}</span><Button aria-label="Increase quantity" variant="ghost" size="icon" onClick={()=>setQuantity(q=>q+1)}><Add/></Button></div><p className="mt-2 text-xs text-muted-foreground">Minimum {product.moq} units</p></div><div className="text-right"><p className="text-xs text-muted-foreground">Order value</p><strong className="text-xl text-ink">{money(orderValue)}</strong></div></div><div className="mt-6 grid grid-cols-2 gap-3"><Button size="lg" onClick={()=>addToCart(product.id,quantity)}>Add to cart</Button><Button size="lg" variant="outline" onClick={()=>{addToCart(product.id,quantity);navigate({to:"/checkout"})}}>Buy now</Button></div><Button variant="ghost" className="mt-2 w-full" onClick={()=>toggleWishlist(product.id)}>{wishlist.includes(product.id)?"Remove from":"Save to"} wishlist</Button><div className="mt-5 border bg-canvas p-5"><div className="flex items-center gap-3"><span className="grid size-12 place-items-center bg-ink font-extrabold text-primary-foreground">{w.initials}</span><div className="min-w-0 flex-1 font-bold text-ink flex items-center gap-1">{w.name}<Verified className="size-4 text-primary"/><p className="mt-1 text-xs text-muted-foreground">{w.rating} rating · {w.location}</p></div><StatusBadge status="Connected"/></div><div className="mt-4 grid grid-cols-2 gap-3 border-t pt-4 text-xs"><span className="flex gap-2"><VerifiedUser className="size-4 text-success"/>Verified supplier</span><span className="flex gap-2"><LocalShipping className="size-4 text-success"/>{w.delivery}</span></div></div></div></div><section className="mt-14 grid gap-10 lg:grid-cols-[1fr_360px]"><div><h2 className="section-title">Product information</h2><p className="mt-4 leading-7 text-muted-foreground">{product.description}</p><div className="mt-6 divide-y border bg-card">{Object.entries(product.specs).map(([k,v])=><div key={k} className="grid grid-cols-2 gap-4 p-4 text-sm"><span className="text-muted-foreground">{k}</span><b>{v}</b></div>)}</div></div><aside className="border bg-card p-6"><h2 className="text-xl font-bold text-ink">Trade assurance</h2><div className="mt-5 space-y-5">{[[VerifiedUser,"Verified source","Business credentials checked"],[Inventory,"Quality ready","Retail-ready packaging"],[LocalShipping,"Reliable fulfilment",w.delivery],[HeadsetMic,"Retailer support","Order assistance available"]].map(([Icon,title,body])=><div key={String(title)} className="flex gap-3"><span className="grid size-9 shrink-0 place-items-center bg-success/10 text-success"><Icon className="size-4"/></span><div><b className="text-sm">{String(title)}</b><p className="mt-1 text-xs text-muted-foreground">{String(body)}</p></div></div>)}</div></aside></section><section className="mt-14"><SectionHeading title="More from this category" subtitle={`Available from ${w.name}`}/><ProductGrid products={products.filter(p=>p.category===product.category&&p.id!==product.id&&p.wholesalerId===linkedWholesalerId).slice(0,4)}/></section></main>}
 export function CategoriesPage() {
-  const totalProducts = categories.reduce((total, category) => total + category.count, 0);
+  const { linkedWholesalerId, linkedWholesaler } = useStore();
+  const linkedProducts = products.filter((p) => p.wholesalerId === linkedWholesalerId);
+  const totalProducts = linkedProducts.length;
 
   return (
     <main>
       <section className="border-y border-primary/10 bg-primary/[0.045]">
         <div className="shell py-16 sm:py-20">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Trade catalogue</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">{linkedWholesaler.name} Catalogue</p>
           <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-ink sm:text-5xl">Shop by category</h1>
           <div className="mt-5 h-px w-16 bg-primary" />
-          <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground">Choose a category to discover wholesalers who specialise in it.</p>
-          <p className="mt-4 text-sm font-semibold text-ink"><span className="text-primary">{categories.length} categories</span><span className="mx-2 text-border">•</span>{totalProducts.toLocaleString()}+ trade products</p>
+          <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground">Explore trade categories supplied directly by {linkedWholesaler.name}.</p>
+          <p className="mt-4 text-sm font-semibold text-ink"><span className="text-primary">{categories.length} categories</span><span className="mx-2 text-border">•</span>{totalProducts} trade products available</p>
         </div>
       </section>
       <section className="shell py-16 sm:py-20">
-        <div className="mb-10 border-b border-border/80 pb-6"><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Browse the marketplace</p><h2 className="mt-2 text-2xl font-extrabold text-ink">Source with confidence</h2></div>
+        <div className="mb-10 border-b border-border/80 pb-6"><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Store catalogue</p><h2 className="mt-2 text-2xl font-extrabold text-ink">Category Directory</h2></div>
         <div className="grid auto-rows-fr gap-6 md:grid-cols-2 lg:grid-cols-3 xl:gap-8">
           {categories.map((c, i) => {
+            const catProductsCount = linkedProducts.filter((p) => p.category === c.name).length;
             const lead = c.name === "Grocery & Staples";
             const featured = lead || c.name === "Home Care";
-            return <Link key={c.id} to="/wholesalers" search={{category:c.name}} aria-label={`Find ${c.count} ${c.name} trade products`} className={cn("group relative flex h-full min-h-96 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-500 hover:-translate-y-1 hover:border-primary/50 hover:shadow-xl focus-visible:-translate-y-1 focus-visible:border-primary focus-visible:shadow-xl focus-visible:outline-none motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2", lead && "md:col-span-2") } style={{animationDelay:`${i * 70}ms`}}>
+            return <Link key={c.id} to="/products" search={{category:c.name}} aria-label={`Find ${c.name} trade products`} className={cn("group relative flex h-full min-h-96 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-500 hover:-translate-y-1 hover:border-primary/50 hover:shadow-xl focus-visible:-translate-y-1 focus-visible:border-primary focus-visible:shadow-xl focus-visible:outline-none motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2", lead && "md:col-span-2") } style={{animationDelay:`${i * 70}ms`}}>
               <div className={cn("relative h-56 shrink-0 overflow-hidden", lead && "sm:h-64")}>
                 <img src={categoryImages[c.name]} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/15 to-transparent" />
                 {featured && <span className="absolute left-5 top-5 rounded-full bg-primary px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-primary-foreground">{c.name === "Home Care" ? "Trending" : "Popular"}</span>}
                 <h3 className="absolute inset-x-6 bottom-5 text-2xl font-extrabold leading-tight text-primary-foreground">{c.name}</h3>
               </div>
-              <div className="flex flex-1 flex-col p-7"><p className="text-sm leading-6 text-muted-foreground">{c.description}</p><span className="mt-auto inline-flex w-fit items-center gap-1.5 pt-7 text-sm font-bold text-primary"><span className="border-b border-primary/35 pb-0.5 transition-colors group-hover:border-primary">Find {c.count} trade products</span><ChevronRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" /></span></div>
+              <div className="flex flex-1 flex-col p-7"><p className="text-sm leading-6 text-muted-foreground">{c.description}</p><span className="mt-auto inline-flex w-fit items-center gap-1.5 pt-7 text-sm font-bold text-primary"><span className="border-b border-primary/35 pb-0.5 transition-colors group-hover:border-primary">Browse {catProductsCount} trade products</span><ChevronRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" /></span></div>
             </Link>;
           })}
         </div>
@@ -279,7 +280,11 @@ export function CategoriesPage() {
     </main>
   );
 }
-export function WholesalersPage({initialCategory="All"}:{initialCategory?:string}) {
+// ===== COMMENTED OUT: multi-wholesaler discovery & connection-request flow =====
+// Reason: switched to single-wholesaler-per-retailer model (wholesaler sends direct registration link)
+// Kept for potential future use — do not delete
+/*
+export function MultiWholesalersPage({initialCategory="All"}:{initialCategory?:string}) {
   const [q,setQ]=useState("");
   const [category,setCategory]=useState(initialCategory);
   const chipListRef=useRef<HTMLDivElement>(null);
@@ -301,13 +306,20 @@ export function WholesalersPage({initialCategory="All"}:{initialCategory?:string
     <section className="shell"><div className="flex flex-wrap items-center justify-between gap-3 border-y py-5 text-sm"><span className="font-semibold text-ink">{shown.length} verified match{shown.length===1?"":"es"} {category!=="All"?`for “${category}”`:"across all categories"}</span><span className="flex items-center gap-2 text-muted-foreground"><VerifiedUser className="size-4 text-success"/>Catalogue access stays private until connected</span></div><div className="mt-8 grid grid-cols-1 items-stretch gap-6 md:grid-cols-2 lg:grid-cols-3 xl:gap-8">{shown.map((w,index)=><div key={w.id} className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2" style={{animationDelay:`${index*50}ms`}}><WholesalerCard wholesaler={w} premium/></div>)}</div>{shown.length===0&&<div className="mt-8 border border-dashed bg-card p-12 text-center"><Search className="mx-auto size-9 text-muted-foreground"/><h2 className="mt-4 font-bold text-ink">No matching wholesalers</h2><p className="mt-2 text-sm text-muted-foreground">Try another category, location or business name.</p><Button className="mt-5 min-h-[44px]" variant="outline" onClick={()=>{setQ("");setCategory("All")}}>Clear search</Button></div>}</section>
   </main>
 }
+*/
+// ===== END COMMENTED OUT SECTION =====
+
+export function WholesalersPage() {
+  const { linkedWholesalerId } = useStore();
+  return <WholesalerProfilePage wholesalerId={linkedWholesalerId} />;
+}
 
 export function WholesalerProfilePage({ wholesalerId }: { wholesalerId: string }) {
-  const w = getWholesaler(wholesalerId);
-  const { relationships, requestAccess, approveRequest } = useStore();
-  const relationship = relationships[w.id] ?? w.relationship;
+  const { linkedWholesalerId, linkedWholesaler } = useStore();
+  const targetId = wholesalerId || linkedWholesalerId;
+  const w = getWholesaler(targetId) || linkedWholesaler;
   const visibleProducts = products.filter(
-    (p) => p.wholesalerId === w.id && relationship === "Connected"
+    (p) => p.wholesalerId === w.id
   );
 
   return (
@@ -319,10 +331,10 @@ export function WholesalerProfilePage({ wholesalerId }: { wholesalerId: string }
         <div className="shell relative py-10 sm:py-12">
           {/* Breadcrumbs */}
           <Link
-            to="/wholesalers"
+            to="/products"
             className="text-xs font-semibold text-primary-foreground/70 transition-colors hover:text-primary-foreground"
           >
-            ← All wholesalers
+            ← Store catalogue
           </Link>
 
           {/* Business Banner Info */}
@@ -357,23 +369,13 @@ export function WholesalerProfilePage({ wholesalerId }: { wholesalerId: string }
               </div>
             </div>
 
-            {/* Action Button: Single "Browse catalog" button (No duplicate or empty icons) */}
+            {/* Action Button: Single "Browse catalog" button */}
             <div>
-              {relationship === "Request Access" ? (
-                <Button size="lg" className="rounded-xl font-bold shadow-md" onClick={() => requestAccess(w.id)}>
-                  Request catalogue access
-                </Button>
-              ) : relationship === "Request Pending" ? (
-                <Button size="lg" variant="secondary" className="rounded-xl font-bold shadow-md" onClick={() => approveRequest(w.id)}>
-                  Approve connection (demo)
-                </Button>
-              ) : (
-                <Button asChild size="lg" className="rounded-xl font-bold shadow-md">
-                  <Link to="/wholesalers/$wholesalerId/catalog" params={{ wholesalerId: w.id }}>
-                    Browse catalog
-                  </Link>
-                </Button>
-              )}
+              <Button asChild size="lg" className="rounded-xl font-bold shadow-md">
+                <Link to="/products">
+                  Browse full catalog
+                </Link>
+              </Button>
             </div>
           </div>
 
@@ -446,65 +448,37 @@ export function WholesalerProfilePage({ wholesalerId }: { wholesalerId: string }
           <section>
             <SectionHeading
               title="Wholesale catalogue"
-              subtitle={
-                relationship === "Connected"
-                  ? `${visibleProducts.length} products available in your approved view`
-                  : "Connect with this wholesaler to unlock pricing and products"
-              }
+              subtitle={`${visibleProducts.length} products available directly from ${w.name}`}
             />
 
-            {relationship === "Connected" ? (
-              <>
-                {/* Category Filter Tab Pills */}
-                <div className="mb-6 flex flex-wrap gap-2">
-                  {w.categories.map((category) => (
-                    <Button
-                      key={category}
-                      asChild
-                      size="sm"
-                      variant="outline"
-                      className="rounded-full border-border/80 bg-card px-4 text-xs font-bold text-foreground shadow-2xs transition-all hover:border-primary hover:bg-primary hover:text-primary-foreground"
-                    >
-                      <Link
-                        to="/wholesalers/$wholesalerId/catalog"
-                        params={{ wholesalerId: w.id }}
-                        search={{ category }}
-                      >
-                        {category}
-                      </Link>
-                    </Button>
-                  ))}
-                </div>
-
-                {/* Product Grid with Premium Cards (includes category tag above title) */}
-                <ProductGrid products={visibleProducts.slice(0, 8)} premium />
-
-                <Button asChild size="lg" className="mt-8 rounded-xl font-bold shadow-md">
-                  <Link to="/wholesalers/$wholesalerId/catalog" params={{ wholesalerId: w.id }}>
-                    Browse full catalog →
+            {/* Category Filter Tab Pills */}
+            <div className="mb-6 flex flex-wrap gap-2">
+              {w.categories.map((category) => (
+                <Button
+                  key={category}
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="rounded-full border-border/80 bg-card px-4 text-xs font-bold text-foreground shadow-2xs transition-all hover:border-primary hover:bg-primary hover:text-primary-foreground"
+                >
+                  <Link
+                    to="/products"
+                    search={{ category }}
+                  >
+                    {category}
                   </Link>
                 </Button>
-              </>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-border/80 bg-card p-10 text-center shadow-xs">
-                <HowToReg className="mx-auto size-12 text-primary" />
-                <h2 className="mt-4 text-xl font-extrabold text-ink">Private trade catalogue</h2>
-                <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-                  {relationship === "Request Access"
-                    ? "Send a connection request. Once approved, wholesale prices, stock and ordering will unlock here."
-                    : "Your request is awaiting review. Approve it below to preview the completed retailer journey."}
-                </p>
-                {relationship === "Request Access" ? (
-                  <Button className="mt-6 rounded-xl font-bold" onClick={() => requestAccess(w.id)}>
-                    Request connection
-                  </Button>
-                ) : (
-                  <Button className="mt-6 rounded-xl font-bold" variant="outline" onClick={() => approveRequest(w.id)}>
-                    Approve connection (demo)
-                  </Button>
-                )}
-              </div>
-            )}
+              ))}
+            </div>
+
+            {/* Product Grid with Premium Cards */}
+            <ProductGrid products={visibleProducts.slice(0, 8)} premium />
+
+            <Button asChild size="lg" className="mt-8 rounded-xl font-bold shadow-md">
+              <Link to="/products">
+                Browse full catalog →
+              </Link>
+            </Button>
           </section>
 
           {/* Business Profile & Feedback Sidebar */}

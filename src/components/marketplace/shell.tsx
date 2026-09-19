@@ -29,7 +29,11 @@ import { cn } from "@/lib/utils";
 const primary = [
   { to: "/products" as const, label: "Products" },
   { to: "/categories" as const, label: "Categories" },
-  { to: "/wholesalers" as const, label: "Wholesalers" },
+// ===== COMMENTED OUT: multi-wholesaler discovery & connection-request flow =====
+// Reason: switched to single-wholesaler-per-retailer model (wholesaler sends direct registration link)
+// Kept for potential future use — do not delete
+// { to: "/wholesalers" as const, label: "Wholesalers" },
+// ===== END COMMENTED OUT SECTION =====
   { to: "/orders" as const, label: "Orders" },
 ];
 
@@ -65,7 +69,7 @@ export function SearchBar({ hero = false }: { hero?: boolean }) {
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search 1,000+ trade products or wholesalers..."
+        placeholder="Search trade products..."
         className={cn(
           "w-full rounded-xl border border-input bg-background pl-10 pr-4 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 transition-all min-h-[44px]",
           hero && "py-3 text-base rounded-2xl shadow-lg border-primary/20"
@@ -123,7 +127,7 @@ export function IconLink({
 export function MarketplaceShell({ children }: { children: React.ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
-  const { retailerProfile, logout, isLoggedIn } = useStore();
+  const { retailerProfile, logout, isLoggedIn, linkedWholesaler } = useStore();
   const auth = ["/login", "/register", "/forgot-password"].includes(path);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -145,17 +149,27 @@ export function MarketplaceShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Top Banner */}
-      <div className="bg-ink py-2 px-4 text-center text-xs font-semibold text-primary-foreground">
-        Free delivery from select wholesalers on orders above ₹15,000
+      <div className="bg-ink py-2 px-4 text-center text-xs font-semibold text-primary-foreground flex items-center justify-center gap-2">
+        <span>Exclusive wholesale trade store for</span>
+        <strong className="text-primary-foreground font-black underline underline-offset-2">{linkedWholesaler.name}</strong>
+        <span>• Free delivery above ₹15,000</span>
       </div>
 
       {/* Header */}
       <header className="premium-header sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
         <div className="shell flex h-16 sm:h-18 items-center justify-between gap-3 sm:gap-6">
-          <div className="flex items-center gap-3 lg:gap-6">
+          <div className="flex items-center gap-3 lg:gap-5">
             <Logo />
+            {/* Wholesaler Branding Badge in Navbar */}
+            <div className="hidden sm:flex items-center gap-2 rounded-xl border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs">
+              <Store className="size-4 text-primary shrink-0" />
+              <div className="flex flex-col text-left">
+                <span className="text-[9px] uppercase tracking-widest font-extrabold text-primary leading-none">Shopping Store</span>
+                <span className="font-black text-ink text-xs leading-tight">{linkedWholesaler.name}</span>
+              </div>
+            </div>
             {/* Desktop Navigation Links */}
-            <nav className="hidden lg:flex shrink-0 items-center gap-1">
+            <nav className="hidden lg:flex shrink-0 items-center gap-1 ml-1">
               {primary.map((item) => (
                 <Link
                   key={item.to}
@@ -201,6 +215,9 @@ export function MarketplaceShell({ children }: { children: React.ReactNode }) {
                 <div className="px-3 py-2 border-b border-border/60 mb-1">
                   <p className="text-xs font-bold text-ink truncate">{retailerProfile.ownerName}</p>
                   <p className="text-[11px] text-muted-foreground truncate">{retailerProfile.businessName}</p>
+                  <div className="mt-1 text-[10px] font-extrabold text-primary bg-primary/10 px-2 py-0.5 rounded-full inline-block truncate">
+                    Linked to: {linkedWholesaler.name}
+                  </div>
                 </div>
                 {account.map((item) => (
                   <Link
@@ -242,7 +259,17 @@ export function MarketplaceShell({ children }: { children: React.ReactNode }) {
                   </SheetTitle>
                 </SheetHeader>
 
-                <div className="mt-6 space-y-6">
+                <div className="mt-4 space-y-6">
+                  {/* Linked Wholesaler Badge in Drawer */}
+                  <div className="flex items-center gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-3.5 text-xs">
+                    <Store className="size-5 text-primary shrink-0" />
+                    <div>
+                      <p className="text-[10px] uppercase font-extrabold text-primary tracking-wider">Shopping With</p>
+                      <p className="font-extrabold text-ink text-sm">{linkedWholesaler.name}</p>
+                      <p className="text-[11px] text-muted-foreground">{linkedWholesaler.ownerName} • {linkedWholesaler.location}</p>
+                    </div>
+                  </div>
+
                   {/* Search in Drawer */}
                   <SearchBar />
 
@@ -338,7 +365,11 @@ export function MarketplaceShell({ children }: { children: React.ReactNode }) {
               <ul className="mt-4 space-y-2 text-xs text-primary-foreground/70">
                 <li><Link to="/products" className="hover:text-primary transition-colors min-h-[44px] inline-flex items-center">All Products</Link></li>
                 <li><Link to="/categories" className="hover:text-primary transition-colors min-h-[44px] inline-flex items-center">Browse Categories</Link></li>
-                <li><Link to="/wholesalers" className="hover:text-primary transition-colors min-h-[44px] inline-flex items-center">Verified Wholesalers</Link></li>
+                {/* ===== COMMENTED OUT: multi-wholesaler discovery & connection-request flow ===== */}
+                {/* Reason: switched to single-wholesaler-per-retailer model (wholesaler sends direct registration link) */}
+                {/* Kept for potential future use — do not delete */}
+                {/* <li><Link to="/wholesalers" className="hover:text-primary transition-colors min-h-[44px] inline-flex items-center">Verified Wholesalers</Link></li> */}
+                {/* ===== END COMMENTED OUT SECTION ===== */}
               </ul>
             </div>
             <div>

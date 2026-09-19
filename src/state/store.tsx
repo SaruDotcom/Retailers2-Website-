@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { products, wholesalers, orders as initialOrders, type Order, type Relationship, type RetailerProfile } from "@/data/mock";
+import { products, wholesalers, orders as initialOrders, getWholesaler, type Order, type Relationship, type RetailerProfile, type Wholesaler } from "@/data/mock";
 
 export type NotificationItem = { id: string; title: string; body: string; time: string; unread: boolean };
 export type CartLine = { productId: string; quantity: number };
@@ -11,6 +11,7 @@ export type UserSession = {
 };
 
 export type UserData = {
+  linkedWholesalerId: string;
   profile: RetailerProfile;
   relationships: Record<string, Relationship>;
   orders: Order[];
@@ -23,6 +24,8 @@ export type UserData = {
 export type Store = {
   currentUser: UserSession | null;
   isLoggedIn: boolean;
+  linkedWholesalerId: string;
+  linkedWholesaler: Wholesaler;
   cart: CartLine[];
   wishlist: string[];
   relationships: Record<string, Relationship>;
@@ -33,6 +36,7 @@ export type Store = {
   recentlyViewed: string[];
   login: (email: string, password?: string) => void;
   logout: () => void;
+  registerWithWholesaler: (profile: RetailerProfile, wholesalerId: string) => void;
   addToCart: (id: string, q?: number) => void;
   setQuantity: (id: string, q: number) => void;
   removeCart: (id: string) => void;
@@ -47,7 +51,7 @@ export type Store = {
 
 const StoreContext = createContext<Store | undefined>(undefined);
 
-// Pre-configured templates for seamless multi-account testing
+// Pre-configured templates for seamless testing
 const userAProfile: RetailerProfile = {
   businessName: "Kapoor General Store",
   ownerName: "Amit Kapoor",
@@ -64,6 +68,7 @@ const userAProfile: RetailerProfile = {
 };
 
 const userATemplate: UserData = {
+  linkedWholesalerId: "sharma",
   profile: userAProfile,
   relationships: {
     sharma: "Connected",
@@ -107,6 +112,7 @@ const userBProfile: RetailerProfile = {
 };
 
 const userBTemplate: UserData = {
+  linkedWholesalerId: "orbit",
   profile: userBProfile,
   relationships: {
     orbit: "Connected",
@@ -144,10 +150,33 @@ const userBTemplate: UserData = {
   ],
 };
 
-function getNewUserTemplate(email: string, profileInput?: Partial<RetailerProfile>): UserData {
+export function resolveWholesalerId(input?: string | null): string {
+  if (!input) return "sharma";
+  const clean = input.trim().toLowerCase();
+  if (clean === "wh-0001" || clean === "sharma" || clean === "sharma-distributors") return "sharma";
+  if (clean === "wh-0002" || clean === "gupta" || clean === "gupta-wholesale") return "gupta";
+  if (clean === "wh-0003" || clean === "orbit" || clean === "orbit-trade") return "orbit";
+  if (clean === "wh-0004" || clean === "sunrise" || clean === "sunrise-foods") return "sunrise";
+  if (clean === "wh-0005" || clean === "paperlane") return "paperlane";
+  if (clean === "wh-0006" || clean === "greenway") return "greenway";
+  if (clean === "wh-0007" || clean === "metro") return "metro";
+  if (clean === "wh-0008" || clean === "northstar") return "northstar";
+  const match = wholesalers.find((w) => w.id.toLowerCase() === clean || w.name.toLowerCase().includes(clean));
+  return match?.id || "sharma";
+}
+
+function getNewUserTemplate(email: string, profileInput?: Partial<RetailerProfile>, targetWholesalerId = "sharma"): UserData {
   const cleanName = email.split("@")[0] ?? "New User";
   const formattedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+  const wId = resolveWholesalerId(targetWholesalerId);
+  const wObj = getWholesaler(wId);
+
+  const relationshipsMap = Object.fromEntries(
+    wholesalers.map((w) => [w.id, w.id === wId ? ("Connected" as Relationship) : ("Request Access" as Relationship)])
+  );
+
   return {
+    linkedWholesalerId: wId,
     profile: {
       businessName: profileInput?.businessName || `${formattedName}'s Retail Store`,
       ownerName: profileInput?.ownerName || formattedName,
@@ -162,13 +191,19 @@ function getNewUserTemplate(email: string, profileInput?: Partial<RetailerProfil
       state: profileInput?.state || "Delhi",
       pincode: profileInput?.pincode || "110001",
     },
-    relationships: Object.fromEntries(wholesalers.map((w) => [w.id, "Request Access" as Relationship])),
+    relationships: relationshipsMap,
     orders: [],
     cart: [],
     wishlist: [],
     recentlyViewed: [],
     notifications: [
-      { id: "new1", title: "Welcome to NEXORA!", body: "Browse wholesalers by category and send connection requests to unlock trade catalogs.", time: "Just now", unread: true },
+      {
+        id: "new1",
+        title: `Welcome! Connected to ${wObj.name}`,
+        body: `You have direct wholesale trade access to ${wObj.name}. Start exploring trade products now.`,
+        time: "Just now",
+        unread: true,
+      },
     ],
   };
 }
@@ -177,7 +212,9 @@ function resolveUserTemplate(userId: string, email: string): UserData {
   const saved = window.localStorage.getItem(`nexora-user-data_${userId}`);
   if (saved) {
     try {
-      return JSON.parse(saved) as UserData;
+      const parsed = JSON.parse(saved) as UserData;
+      if (!parsed.linkedWholesalerId) parsed.linkedWholesalerId = "sharma";
+      return parsed;
     } catch {}
   }
   if (userId === "user-amit" || email.toLowerCase().includes("amit")) {
@@ -226,7 +263,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(`nexora-user-data_${activeUserId}`, JSON.stringify(userData));
   }, [activeUserId, userData]);
 
-  const { cart, wishlist, relationships, orders, profile: retailerProfile, recentlyViewed, notifications } = userData;
+  const { cart, wishlist, relationships, orders, profile: retailerProfile, recentlyViewed, notifications, linkedWholesalerId = "sharma" } = userData;
+
+  const linkedWholesaler = useMemo(() => getWholesaler(linkedWholesalerId), [linkedWholesalerId]);
 
   const setCart = (updater: CartLine[] | ((prev: CartLine[]) => CartLine[])) => {
     setUserData((prev) => ({
@@ -308,10 +347,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     toast.success("Retailer profile saved");
   };
 
+  const registerWithWholesaler = (profileInput: RetailerProfile, targetWholesalerId: string) => {
+    const cleanEmail = profileInput.email.trim().toLowerCase();
+    const userId = `user-${cleanEmail.replace(/[^a-z0-9]/g, "")}`;
+    const targetWId = resolveWholesalerId(targetWholesalerId);
+    const newTemplate = getNewUserTemplate(cleanEmail, profileInput, targetWId);
+
+    setActiveUserId(userId);
+    setCurrentUser({ id: userId, email: cleanEmail });
+    setUserData(newTemplate);
+
+    window.localStorage.setItem("nexora-active-user-id", userId);
+    window.localStorage.setItem(`nexora-user-email_${userId}`, cleanEmail);
+    window.localStorage.setItem(`nexora-user-data_${userId}`, JSON.stringify(newTemplate));
+
+    const wObj = getWholesaler(targetWId);
+    toast.success(`Registered & connected to ${wObj.name}`);
+  };
+
   const value = useMemo<Store>(
     () => ({
       currentUser,
       isLoggedIn: currentUser !== null && !activeUserId.startsWith("guest-"),
+      linkedWholesalerId,
+      linkedWholesaler,
       cart,
       wishlist,
       relationships,
@@ -322,6 +381,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       recentlyViewed,
       login,
       logout,
+      registerWithWholesaler,
       addToCart: (id, q) => {
         const p = products.find((x) => x.id === id);
         if (!p) return;
@@ -379,7 +439,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setRecentlyViewed((prev) => [id, ...prev.filter((x) => x !== id)].slice(0, 12));
       },
     }),
-    [currentUser, activeUserId, cart, wishlist, relationships, orders, retailerProfile, unread, notifications, recentlyViewed]
+    [currentUser, activeUserId, linkedWholesalerId, linkedWholesaler, cart, wishlist, relationships, orders, retailerProfile, unread, notifications, recentlyViewed]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
