@@ -25,14 +25,21 @@ const trustSignals: Array<[typeof VerifiedUser, string, string]> = [
 export function HomePage() {
   const { linkedWholesalerId, linkedWholesaler, recentlyViewed } = useStore();
 
-  const linkedProducts = products.filter(
-    (p) => p.wholesalerId === linkedWholesalerId
-  );
-  const recentlyViewedProducts = products.filter(
-    (p) => recentlyViewed.includes(p.id) && p.wholesalerId === linkedWholesalerId
+  const linkedProducts = useMemo(
+    () => products.filter((p) => p.wholesalerId === linkedWholesalerId),
+    [linkedWholesalerId]
   );
 
-  const topCategories = [...categories].sort((a, b) => b.count - a.count).slice(0, 6);
+  const recentlyViewedProducts = useMemo(
+    () => products.filter((p) => recentlyViewed.includes(p.id) && p.wholesalerId === linkedWholesalerId),
+    [recentlyViewed, linkedWholesalerId]
+  );
+
+  // Filter categories strictly to this ONE wholesaler's products
+  const wholesalerCategories = useMemo(() => {
+    const catSet = new Set(linkedProducts.map((p) => p.category));
+    return categories.filter((c) => catSet.has(c.name ?? ""));
+  }, [linkedProducts]);
 
   return (
     <main>
@@ -52,10 +59,10 @@ export function HomePage() {
               Verified Wholesale Store • {linkedWholesaler.name}
             </span>
             <h1 className="mt-4 sm:mt-6 text-3xl font-black leading-tight sm:text-5xl lg:text-6xl tracking-tight">
-              Direct Wholesale Access to {linkedWholesaler.name}
+              Welcome to {linkedWholesaler.name}’s Wholesale Store
             </h1>
             <p className="mt-4 sm:mt-5 max-w-xl text-sm leading-relaxed text-primary-foreground/80 sm:text-lg mx-auto sm:mx-0">
-              Shop trade-only pricing, place bulk orders, and get direct delivery managed by {linkedWholesaler.ownerName}.
+              Shop trade-only pricing, place bulk orders, and get direct store delivery managed by {linkedWholesaler.ownerName}.
             </p>
             <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center sm:justify-start gap-3">
               <Button asChild size="lg" className="rounded-xl min-h-[44px] font-extrabold shadow-md">
@@ -109,7 +116,7 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* Section 1 — Popular Categories */}
+      {/* Wholesaler's Product Categories Section */}
       <section className="bg-canvas py-12 sm:py-16 lg:py-20">
         <div className="shell">
           <div className="mb-8 sm:mb-10 flex flex-wrap items-end justify-between gap-4">
@@ -117,9 +124,9 @@ export function HomePage() {
               <span className="inline-flex rounded-full bg-primary/10 px-3.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.16em] text-primary">
                 STORE CATEGORIES
               </span>
-              <h2 className="mt-2 text-2xl font-black text-ink sm:text-3xl">Browse {linkedWholesaler.name} Categories</h2>
+              <h2 className="mt-2 text-2xl font-black text-ink sm:text-3xl">Categories from {linkedWholesaler.name}</h2>
               <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
-                Filter trade products available directly from {linkedWholesaler.name}.
+                Browse trade categories available directly in {linkedWholesaler.name}'s store.
               </p>
             </div>
             <Button asChild variant="ghost" size="sm" className="font-bold text-primary hover:bg-primary/10 hover:text-primary min-h-[44px]">
@@ -130,7 +137,8 @@ export function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:gap-8">
-            {topCategories.map((c, i) => {
+            {wholesalerCategories.map((c, i) => {
+              const catProductsCount = linkedProducts.filter((p) => p.category === c.name).length;
               const lead = i === 0;
               return (
                 <Link
@@ -163,7 +171,7 @@ export function HomePage() {
                     </p>
                     <span className="mt-auto inline-flex w-fit items-center gap-1.5 pt-4 text-xs sm:text-sm font-bold text-primary">
                       <span className="border-b border-primary/35 pb-0.5 transition-colors group-hover:border-primary">
-                        Browse {c.name} catalog
+                        Browse {catProductsCount} trade products
                       </span>
                       <ChevronRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
                     </span>
