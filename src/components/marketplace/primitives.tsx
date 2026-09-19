@@ -162,7 +162,7 @@ export function ProductCard({
 
 export function ProductGrid({ products, list = false, premium = false }: { products: Product[]; list?: boolean; premium?: boolean }) {
   return (
-    <div className={premium ? "grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8" : cn(list ? "grid gap-3" : "grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-5")}>
+    <div className={premium ? "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8" : cn(list ? "grid gap-3" : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6")}>
       {products.map((p, index) =>
         premium ? (
           <div key={p.id} className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2" style={{ animationDelay: `${index * 50}ms` }}>
@@ -421,40 +421,43 @@ export function OrderCard({ order }: { order: Order }) {
   const w = getWholesaler(order.wholesalerId);
   const units = order.items.reduce((sum, item) => sum + item.quantity, 0);
   return (
-    <article className="border bg-card p-5 transition-colors hover:border-primary/40">
+    <article className="rounded-2xl border border-border/80 bg-card p-5 transition-all duration-200 hover:border-primary/40 shadow-xs">
       <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-xs font-bold uppercase text-primary">{order.id}</p>
-          <span className="text-xs text-muted-foreground">Placed {order.date}</span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-bold uppercase tracking-wider text-primary">{order.id}</p>
+          <span className="text-xs font-medium text-muted-foreground">Placed {order.date}</span>
         </div>
-        <h3 className="mt-2 flex items-center gap-1.5 font-extrabold text-ink">
-          {w.name}
-          {w.verified && <Verified className="size-4 text-primary" />}
-        </h3>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="flex items-center gap-1.5 font-extrabold text-ink text-base sm:text-lg">
+            {w.name}
+            {w.verified && <Verified className="size-4 text-primary" />}
+          </h3>
+          <StatusBadge status={order.status} />
+        </div>
         <p className="mt-1 text-xs text-muted-foreground">Separate fulfilment by this wholesaler</p>
       </div>
-      <div className="mt-5 flex items-center justify-between gap-4 border-y py-4">
-        <div className="flex -space-x-2">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-y border-border/60 py-4">
+        <div className="flex -space-x-2 overflow-x-auto py-1">
           {order.items.map((i) => {
             const product = getProduct(i.productId);
-            return <ProductVisual key={i.productId} index={product.image} name={product.name} className="size-12 border-2 border-card" />;
+            return <ProductVisual key={i.productId} index={product.image} name={product.name} className="size-11 sm:size-12 shrink-0 rounded-lg border-2 border-card shadow-xs" />;
           })}
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground">
             {order.items.length} products · {units} units
           </p>
-          <b className="mt-1 block text-lg text-ink">{money(order.total)}</b>
+          <b className="mt-0.5 block text-base sm:text-lg font-black text-ink">{money(order.total)}</b>
         </div>
       </div>
-      <div className="mt-4 flex items-center justify-between gap-3">
+      <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <span className="flex items-center gap-2 text-xs text-muted-foreground">
-          <LocalShipping className="size-4 text-primary" />
+          <LocalShipping className="size-4 shrink-0 text-primary" />
           {order.status === "Delivered" ? "Delivered successfully" : order.status === "Cancelled" ? "Order closed" : "Tracking updates available"}
         </span>
-        <Button asChild variant="outline">
+        <Button asChild variant="outline" size="sm" className="rounded-xl font-bold min-h-[44px] sm:min-h-9">
           <Link to="/orders/$orderId" params={{ orderId: order.id }}>
-            View details <ArrowRight />
+            View details <ArrowRight className="size-4" />
           </Link>
         </Button>
       </div>

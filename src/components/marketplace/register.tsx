@@ -201,7 +201,7 @@ export function RegisterPage() {
           {/* GST */}
           {currentStep === 2 && <div className="grid gap-5">
             <Section icon={AccountBalance} step="Step 2 of 4" title="Tax registration" subtitle="Whether GST-registered or non-GST, both are welcome" />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {([false, true] as const).map((v) => (
                 <button
                   key={String(v)}
