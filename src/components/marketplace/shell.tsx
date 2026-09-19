@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@/lib/router";
+import { Link, useRouterState, useNavigate } from "@/lib/router";
 import {
   Search,
   Favorite,
@@ -23,6 +23,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { products } from "@/data/mock";
+import { useStore } from "@/state/store";
 import { cn } from "@/lib/utils";
 
 const primary = [
@@ -48,88 +49,57 @@ const account = [
 
 export function SearchBar({ hero = false }: { hero?: boolean }) {
   const [query, setQuery] = useState("");
-  const hits =
-    query.length > 1
-      ? products
-          .filter((p) =>
-            `${p.name} ${p.brand} ${p.category}`
-              .toLowerCase()
-              .includes(query.toLowerCase()),
-          )
-          .slice(0, 5)
-      : [];
+  const navigate = useNavigate();
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (query.trim()) {
+      navigate({ to: "/products" });
+    }
+  };
+
   return (
-    <div className={cn("relative w-full", hero && "home-search mx-auto max-w-3xl")}>
-      <form
-        action="/products"
+    <form onSubmit={handleSearch} className="relative w-full">
+      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search 1,000+ trade products or wholesalers..."
         className={cn(
-          "mx-auto flex h-11 sm:h-12 w-full items-center overflow-hidden rounded-xl bg-card border border-border/80 shadow-2xs transition-shadow focus-within:ring-4 focus-within:ring-primary/10",
-          hero && "h-13 sm:h-14 rounded-2xl shadow-md border-border",
+          "w-full rounded-xl border border-input bg-background pl-10 pr-4 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 transition-all min-h-[44px]",
+          hero && "py-3 text-base rounded-2xl shadow-lg border-primary/20"
         )}
-      >
-        <input
-          name="q"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search products, brands or categories"
-          className={cn(
-            "h-full min-w-0 flex-1 border-0 bg-transparent px-3.5 text-sm text-ink outline-none placeholder:text-muted-foreground",
-            hero && "text-sm sm:text-base px-4",
-          )}
-        />
-        <button
-          type="submit"
-          aria-label="Search products"
-          className="grid h-full min-h-[44px] w-12 sm:w-14 shrink-0 place-items-center text-primary transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
-        >
-          <Search className="size-5" />
-        </button>
-      </form>
-      {hits.length > 0 && (
-        <div className="absolute inset-x-0 top-full z-50 mt-2 rounded-xl border border-border bg-popover p-2 elevated">
-          {hits.map((p) => (
-            <Link
-              key={p.id}
-              to="/products/$productId"
-              params={{ productId: p.id }}
-              className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm hover:bg-accent min-h-[44px]"
-              onClick={() => setQuery("")}
-            >
-              <span>
-                <b>{p.name}</b>
-                <small className="ml-2 text-muted-foreground">{p.brand}</small>
-              </span>
-              <span className="text-xs text-primary font-bold">View</span>
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
+      />
+    </form>
   );
 }
 
-function Logo() {
+export function Logo() {
   return (
-    <Link to="/" className="flex shrink-0 items-center gap-2">
-      <img
-        src="/favicon.jpeg"
-        alt="NEXORA"
-        className="size-9 sm:size-10 object-contain"
-      />
-      <span className="text-lg sm:text-xl font-black tracking-tight text-current">
-        NEXORA
+    <Link to="/" className="flex items-center gap-2.5 group focus-visible:outline-none">
+      <span className="grid size-9 sm:size-10 place-items-center rounded-xl bg-gradient-to-br from-primary to-ink text-primary-foreground font-black text-lg shadow-sm transition-transform group-hover:scale-105">
+        N
       </span>
+      <div className="flex flex-col">
+        <span className="font-black text-ink tracking-tight text-lg sm:text-xl leading-none">
+          NEXORA
+        </span>
+        <span className="text-[10px] font-extrabold uppercase tracking-widest text-primary leading-none mt-0.5">
+          Retailer Portal
+        </span>
+      </div>
     </Link>
   );
 }
 
-function IconLink({
+export function IconLink({
   to,
   label,
   children,
   hoverChildren,
 }: {
-  to: "/wishlist" | "/notifications" | "/cart" | "/profile";
+  to: "/wishlist" | "/notifications" | "/cart";
   label: string;
   children: React.ReactNode;
   hoverChildren: React.ReactNode;
@@ -152,10 +122,25 @@ function IconLink({
 
 export function MarketplaceShell({ children }: { children: React.ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const { retailerProfile, logout, isLoggedIn } = useStore();
   const auth = ["/login", "/register", "/forgot-password"].includes(path);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   if (auth) return <>{children}</>;
+
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}`.toUpperCase();
+    return (name.slice(0, 2) || "RT").toUpperCase();
+  };
+
+  const initials = getInitials(retailerProfile.ownerName || retailerProfile.businessName);
+
+  const handleSignOut = () => {
+    logout();
+    navigate({ to: "/login" });
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -208,28 +193,33 @@ export function MarketplaceShell({ children }: { children: React.ReactNode }) {
                 className="min-h-[44px] gap-2 rounded-xl px-2 transition-colors duration-200 hover:bg-secondary hover:text-primary"
               >
                 <span className="grid size-8 place-items-center rounded-lg border border-border bg-secondary text-xs font-black">
-                  AK
+                  {initials}
                 </span>
                 <KeyboardArrowDown className="size-4 text-muted-foreground" />
               </Button>
-              <div className="invisible absolute right-0 top-full w-56 translate-y-1 border rounded-2xl bg-popover p-2 opacity-0 elevated transition-all group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 shadow-lg">
+              <div className="invisible absolute right-0 top-full w-60 translate-y-1 border rounded-2xl bg-popover p-2 opacity-0 elevated transition-all group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 shadow-lg">
+                <div className="px-3 py-2 border-b border-border/60 mb-1">
+                  <p className="text-xs font-bold text-ink truncate">{retailerProfile.ownerName}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{retailerProfile.businessName}</p>
+                </div>
                 {account.map((item) => (
                   <Link
                     key={item.to}
                     to={item.to}
-                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-accent min-h-[44px]"
+                    className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold hover:bg-accent min-h-[40px]"
                   >
                     <item.icon className="size-4 text-primary" />
                     {item.label}
                   </Link>
                 ))}
-                <Link
-                  to="/login"
-                  className="mt-1 flex items-center gap-3 rounded-xl border-t px-3 py-2.5 text-sm font-bold text-primary hover:bg-accent min-h-[44px]"
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="w-full text-left mt-1 flex items-center gap-3 rounded-xl border-t px-3 py-2.5 text-sm font-bold text-primary hover:bg-accent min-h-[44px]"
                 >
                   <Logout className="size-4" />
                   Sign out
-                </Link>
+                </button>
               </div>
             </div>
 
@@ -286,9 +276,13 @@ export function MarketplaceShell({ children }: { children: React.ReactNode }) {
 
                   {/* Account Links */}
                   <div className="border-t pt-4">
-                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground mb-2">
-                      My Retailer Account
-                    </h3>
+                    <div className="mb-3 px-1">
+                      <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
+                        My Retailer Account
+                      </h3>
+                      <p className="text-xs font-bold text-ink truncate mt-1">{retailerProfile.ownerName}</p>
+                      <p className="text-[11px] text-muted-foreground truncate">{retailerProfile.businessName}</p>
+                    </div>
                     <div className="grid gap-1">
                       {account.map((item) => (
                         <Link
@@ -301,14 +295,17 @@ export function MarketplaceShell({ children }: { children: React.ReactNode }) {
                           <span>{item.label}</span>
                         </Link>
                       ))}
-                      <Link
-                        to="/login"
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="mt-2 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-3.5 py-3 text-sm font-extrabold text-primary hover:bg-primary/10 min-h-[44px]"
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          handleSignOut();
+                        }}
+                        className="w-full text-left mt-2 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-3.5 py-3 text-sm font-extrabold text-primary hover:bg-primary/10 min-h-[44px]"
                       >
                         <Logout className="size-4" />
                         <span>Sign out</span>
-                      </Link>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -318,51 +315,54 @@ export function MarketplaceShell({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Mobile Sub-Header Search Bar (visible on mobile screens when drawer is closed) */}
-        <div className="shell pb-3 lg:hidden">
+        <div className="lg:hidden border-t border-border/60 bg-card px-4 py-2.5">
           <SearchBar />
         </div>
       </header>
 
-      {/* Main Content Area */}
+      {/* Main Page Content */}
       <div className="flex-1">{children}</div>
 
       {/* Footer */}
-      <footer className="mt-16 border-t bg-ink text-primary-foreground pb-16 md:pb-0">
-        <div className="shell grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 py-10 sm:py-14">
-          <div className="sm:col-span-2 md:col-span-1">
-            <Logo />
-            <p className="mt-4 max-w-xs text-sm text-primary-foreground/75 leading-relaxed">
-              The professional marketplace connecting independent retailers with verified wholesalers across India.
-            </p>
+      <footer className="border-t border-border bg-ink text-primary-foreground mt-auto">
+        <div className="shell py-12 sm:py-16">
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-4">
+            <div>
+              <Logo />
+              <p className="mt-4 text-xs leading-relaxed text-primary-foreground/70">
+                Empowering independent retailers across India with direct access to verified B2B wholesale suppliers.
+              </p>
+            </div>
+            <div>
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-primary-foreground/90">Marketplace</h4>
+              <ul className="mt-4 space-y-2 text-xs text-primary-foreground/70">
+                <li><Link to="/products" className="hover:text-primary transition-colors min-h-[44px] inline-flex items-center">All Products</Link></li>
+                <li><Link to="/categories" className="hover:text-primary transition-colors min-h-[44px] inline-flex items-center">Browse Categories</Link></li>
+                <li><Link to="/wholesalers" className="hover:text-primary transition-colors min-h-[44px] inline-flex items-center">Verified Wholesalers</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-primary-foreground/90">Account</h4>
+              <ul className="mt-4 space-y-2 text-xs text-primary-foreground/70">
+                <li><Link to="/dashboard" className="hover:text-primary transition-colors min-h-[44px] inline-flex items-center">Workspace Dashboard</Link></li>
+                <li><Link to="/orders" className="hover:text-primary transition-colors min-h-[44px] inline-flex items-center">Order History</Link></li>
+                <li><Link to="/wishlist" className="hover:text-primary transition-colors min-h-[44px] inline-flex items-center">Saved Items</Link></li>
+                <li><Link to="/profile" className="hover:text-primary transition-colors min-h-[44px] inline-flex items-center">Business Profile</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-primary-foreground/90">Retailer Support</h4>
+              <p className="mt-4 text-xs leading-relaxed text-primary-foreground/70">
+                Have questions about wholesale terms or connection requests?
+              </p>
+              <Button asChild size="sm" variant="secondary" className="mt-4 rounded-xl font-bold min-h-[44px]">
+                <Link to="/login">Sign in to workspace</Link>
+              </Button>
+            </div>
           </div>
-          <FooterGroup
-            title="Marketplace"
-            links={[
-              { label: "Products", to: "/products" },
-              { label: "Categories", to: "/categories" },
-              { label: "Wholesalers", to: "/wholesalers" },
-              { label: "Orders", to: "/orders" },
-            ]}
-          />
-          <FooterGroup
-            title="Account"
-            links={[
-              { label: "Dashboard", to: "/dashboard" },
-              { label: "Profile", to: "/profile" },
-              { label: "Addresses", to: "/addresses" },
-              { label: "Settings", to: "/settings" },
-            ]}
-          />
-          <div>
-            <h3 className="font-extrabold text-base text-primary-foreground">Retailer support</h3>
-            <p className="mt-3 text-sm text-primary-foreground/75">
-              Monday–Saturday, 9am–7pm
-            </p>
-            <p className="mt-2 text-sm font-bold text-primary">care@nexora.example</p>
+          <div className="mt-12 border-t border-primary-foreground/10 pt-6 text-center text-xs text-primary-foreground/50">
+            © 2026 NEXORA Retailer Portal. All rights reserved. Trade rates reserved for verified retailers.
           </div>
-        </div>
-        <div className="border-t border-primary-foreground/10 py-5 text-center text-xs text-primary-foreground/50 px-4">
-          © 2026 NEXORA Commerce. Built for growing retailers.
         </div>
       </footer>
 

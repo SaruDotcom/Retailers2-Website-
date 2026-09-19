@@ -1,27 +1,226 @@
-import { Link } from "@/lib/router";
-import { useState } from "react";
+import { Link, useNavigate } from "@/lib/router";
+import { useState, useEffect } from "react";
 import { Check, ChevronRight, Favorite, FavoriteBorder, LocationOn, Inventory2, ShoppingCartOutlined, Verified, VerifiedUser, Lock, LocalShipping, Notifications } from "@mui/icons-material";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { addresses, getProduct, getWholesaler, money, orders, products, type Order } from "@/data/mock";
+import { getProduct, getWholesaler, money, products, type Order, type RetailerProfile } from "@/data/mock";
 import { useStore } from "@/state/store";
 import { CartItem, EmptyState, OrderCard, ProductGrid, SectionHeading, StatusBadge } from "./primitives";
 
-function getFallbackOrder(): Order { const order = orders[0]; if (!order) throw new Error("Mock order data is empty"); return order; }
-function getPrimaryAddress(): (typeof addresses)[number] { const address = addresses[0]; if (!address) throw new Error("Mock address data is empty"); return address; }
-const fallbackOrder: Order = getFallbackOrder();
-const primaryAddress = getPrimaryAddress();
-
 export function DashboardPage() {
-  const { cart, wishlist, relationships } = useStore();
+  const { wishlist, relationships, orders, retailerProfile } = useStore();
   const connectedProducts = products.filter((p) => relationships[p.wholesalerId] === "Connected");
-  return <main className="shell py-10"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase text-primary">Retailer workspace</p><h1 className="mt-2 text-3xl font-extrabold text-ink">Good morning, Amit</h1><p className="mt-2 text-muted-foreground">Your store is ready for its next restock.</p></div><Button asChild><Link to="/products">Continue shopping</Link></Button></div><div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">{[["Active orders", orders.filter(o=>!["Delivered","Cancelled"].includes(o.status)).length,"/orders"],["Pending orders",orders.filter(o=>o.status==="Pending").length,"/orders"],["Connected wholesalers",Object.values(relationships).filter(r=>r==="Connected").length,"/wholesalers"],["Wishlist items",wishlist.length,"/wishlist"]].map(([label,value,to])=><Link key={label} to={to as "/orders"|"/wholesalers"|"/wishlist"} className="border bg-card p-5 interactive"><span className="text-sm text-muted-foreground">{label}</span><strong className="mt-2 block text-3xl text-ink">{value}</strong></Link>)}</div><div className="mt-12 grid gap-12 lg:grid-cols-[1.4fr_1fr]"><section><SectionHeading title="Recent orders" subtitle="Track your latest replenishment activity" href="/orders"/><div className="grid gap-3">{orders.slice(0,3).map(order=><OrderCard key={order.id} order={order}/>)}</div></section><section><SectionHeading title="Quick actions"/><div className="grid gap-3">{[["Find wholesalers","Compare suppliers and grow your network","/wholesalers"],["Review wishlist","Return to products you saved","/wishlist"],["Manage delivery addresses","Keep your store details ready","/addresses"]].map(([title,body,to])=><Link key={title} to={to as "/wholesalers"|"/wishlist"|"/addresses"} className="flex items-center justify-between border bg-card p-5 interactive"><div><b>{title}</b><p className="mt-1 text-sm text-muted-foreground">{body}</p></div><ChevronRight className="size-5 text-primary"/></Link>)}</div></section></div><section className="mt-12"><SectionHeading title="Recommended for your store" subtitle="Popular trade-ready products" href="/products"/><ProductGrid products={connectedProducts.slice(0,4)}/></section></main>
+  const firstName = retailerProfile.ownerName.trim().split(" ")[0] || "Retailer";
+
+  return (
+    <main className="shell py-10">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold uppercase text-primary">Retailer workspace</p>
+          <h1 className="mt-2 text-3xl font-extrabold text-ink">Good morning, {firstName}</h1>
+          <p className="mt-2 text-muted-foreground">{retailerProfile.businessName} is ready for its next restock.</p>
+        </div>
+        <Button asChild><Link to="/products">Continue shopping</Link></Button>
+      </div>
+      <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          ["Active orders", orders.filter(o => !["Delivered", "Cancelled"].includes(o.status)).length, "/orders"],
+          ["Pending orders", orders.filter(o => o.status === "Pending").length, "/orders"],
+          ["Connected wholesalers", Object.values(relationships).filter(r => r === "Connected").length, "/wholesalers"],
+          ["Wishlist items", wishlist.length, "/wishlist"],
+        ].map(([label, value, to]) => (
+          <Link key={label as string} to={to as "/orders" | "/wholesalers" | "/wishlist"} className="border bg-card p-5 interactive">
+            <span className="text-sm text-muted-foreground">{label}</span>
+            <strong className="mt-2 block text-3xl text-ink">{value}</strong>
+          </Link>
+        ))}
+      </div>
+      <div className="mt-12 grid gap-12 lg:grid-cols-[1.4fr_1fr]">
+        <section>
+          <SectionHeading title="Recent orders" subtitle="Track your latest replenishment activity" href="/orders" />
+          {orders.length > 0 ? (
+            <div className="grid gap-3">
+              {orders.slice(0, 3).map((order) => (
+                <OrderCard key={order.id} order={order} />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border/80 p-6 text-center text-sm text-muted-foreground bg-card">
+              No orders placed yet. Connect with wholesalers to start ordering.
+            </div>
+          )}
+        </section>
+        <section>
+          <SectionHeading title="Quick actions" />
+          <div className="grid gap-3">
+            {[
+              ["Find wholesalers", "Compare suppliers and grow your network", "/wholesalers"],
+              ["Review wishlist", "Return to products you saved", "/wishlist"],
+              ["Manage delivery addresses", "Keep your store details ready", "/addresses"],
+            ].map(([title, body, to]) => (
+              <Link key={title} to={to as "/wholesalers" | "/wishlist" | "/addresses"} className="flex items-center justify-between border bg-card p-5 interactive">
+                <div>
+                  <b>{title}</b>
+                  <p className="mt-1 text-sm text-muted-foreground">{body}</p>
+                </div>
+                <ChevronRight className="size-5 text-primary" />
+              </Link>
+            ))}
+          </div>
+        </section>
+      </div>
+      <section className="mt-12">
+        <SectionHeading title="Recommended for your store" subtitle="Popular trade-ready products" href="/products" />
+        <ProductGrid products={connectedProducts.length > 0 ? connectedProducts.slice(0, 4) : products.slice(0, 4)} />
+      </section>
+    </main>
+  );
 }
 
-export function OrdersPage() { return <main className="shell py-10"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase text-primary">Order history</p><h1 className="mt-2 text-3xl font-extrabold text-ink">Your orders</h1><p className="mt-2 text-muted-foreground">Every wholesale order, in one place.</p></div><Button asChild variant="outline"><Link to="/products">Shop products</Link></Button></div><div className="mt-8 flex flex-wrap gap-2 border-b pb-3">{["All orders","Pending","Confirmed","Processing","Shipped","Delivered","Cancelled"].map((tab,i)=><Button key={tab} variant={i===0?"secondary":"ghost"} size="sm">{tab}</Button>)}</div><div className="mt-6 grid gap-3">{orders.map(order=><OrderCard key={order.id} order={order}/>)}</div></main> }
+export function OrdersPage() {
+  const { orders } = useStore();
+  const [activeTab, setActiveTab] = useState("All orders");
 
-export function OrderDetailsPage({ orderId }: { orderId: string }) { const order=orders.find(o=>o.id===orderId) ?? fallbackOrder; const wholesaler=getWholesaler(order.wholesalerId); return <main className="shell py-10"><Link to="/orders" className="text-sm text-muted-foreground hover:text-primary">← Back to orders</Link><div className="mt-6 flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs text-muted-foreground">Order {order.id} · {order.date}</p><h1 className="mt-2 text-3xl font-extrabold text-ink">{wholesaler.name}</h1></div><StatusBadge status={order.status}/></div><div className="mt-8 grid gap-8 lg:grid-cols-[1fr_320px]"><section className="border bg-card p-6"><h2 className="text-xl font-bold">Order timeline</h2><div className="mt-6 grid gap-5">{["Order placed","Confirmed","Processing","Packed","Shipped","Delivered"].map((step,i)=><div key={step} className="flex items-center gap-4"><span className={`grid size-8 place-items-center border ${i<3?"border-primary bg-primary text-primary-foreground":"text-muted-foreground"}`}>{i<3?<Check className="size-4"/>:i+1}</span><div><b>{step}</b><p className="text-xs text-muted-foreground">{i<3?"Completed":"Awaiting update"}</p></div></div>)}</div></section><aside className="space-y-4"><div className="border bg-card p-5"><h2 className="font-bold">Order summary</h2><div className="mt-4 flex justify-between text-sm"><span>{order.items.length} products</span><b>{money(order.total)}</b></div><Button className="mt-5 w-full" variant="outline">Download invoice</Button></div><div className="border bg-card p-5"><h2 className="flex items-center gap-2 font-bold"><LocationOn className="size-4 text-primary"/>Delivery address</h2><p className="mt-3 text-sm leading-6 text-muted-foreground">{primaryAddress.name}<br/>{primaryAddress.line}<br/>{primaryAddress.phone}</p></div></aside></div><section className="mt-8 border bg-card p-6"><h2 className="text-xl font-bold">Products in this order</h2><div className="mt-4 divide-y">{order.items.map(item=>{const p=getProduct(item.productId);return <div key={item.productId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 py-4"><div><b>{p.name}</b><p className="mt-1 text-sm text-muted-foreground">{item.quantity} units · {money(p.price)} each</p></div><strong className="text-primary sm:text-ink">{money(p.price*item.quantity)}</strong></div>})}</div></section></main> }
+  const filteredOrders = orders.filter((o) => {
+    if (activeTab === "All orders") return true;
+    return o.status === activeTab;
+  });
+
+  return (
+    <main className="shell py-10">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold uppercase text-primary">Order history</p>
+          <h1 className="mt-2 text-3xl font-extrabold text-ink">Your orders</h1>
+          <p className="mt-2 text-muted-foreground">Every wholesale order, in one place.</p>
+        </div>
+        <Button asChild variant="outline">
+          <Link to="/products">Shop products</Link>
+        </Button>
+      </div>
+      <div className="mt-8 flex flex-wrap gap-2 border-b pb-3">
+        {["All orders", "Pending", "Confirmed", "Processing", "Shipped", "Delivered", "Cancelled"].map((tab) => (
+          <Button
+            key={tab}
+            variant={activeTab === tab ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab}
+          </Button>
+        ))}
+      </div>
+      {filteredOrders.length > 0 ? (
+        <div className="mt-6 grid gap-3">
+          {filteredOrders.map((order) => (
+            <OrderCard key={order.id} order={order} />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-10 grid min-h-64 place-items-center rounded-2xl border border-dashed bg-card p-8 text-center">
+          <div>
+            <Inventory2 className="mx-auto size-10 text-muted-foreground" />
+            <h3 className="mt-3 font-bold text-ink">No orders found</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {activeTab === "All orders" ? "You haven't placed any wholesale orders yet." : `No orders with status "${activeTab}".`}
+            </p>
+            <Button asChild className="mt-5 rounded-xl font-bold">
+              <Link to="/products">Browse Products</Link>
+            </Button>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
+export function OrderDetailsPage({ orderId }: { orderId: string }) {
+  const { orders, retailerProfile } = useStore();
+  const order = orders.find((o) => o.id === orderId) ?? orders[0];
+
+  if (!order) {
+    return (
+      <main className="shell py-16 text-center">
+        <h1 className="text-2xl font-bold">Order not found</h1>
+        <Button asChild className="mt-4"><Link to="/orders">Back to orders</Link></Button>
+      </main>
+    );
+  }
+
+  const wholesaler = getWholesaler(order.wholesalerId);
+
+  return (
+    <main className="shell py-10">
+      <Link to="/orders" className="text-sm text-muted-foreground hover:text-primary">
+        ← Back to orders
+      </Link>
+      <div className="mt-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs text-muted-foreground">Order {order.id} · {order.date}</p>
+          <h1 className="mt-2 text-3xl font-extrabold text-ink">{wholesaler.name}</h1>
+        </div>
+        <StatusBadge status={order.status} />
+      </div>
+      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_320px]">
+        <section className="border bg-card p-6">
+          <h2 className="text-xl font-bold">Order timeline</h2>
+          <div className="mt-6 grid gap-5">
+            {["Order placed", "Confirmed", "Processing", "Packed", "Shipped", "Delivered"].map((step, i) => (
+              <div key={step} className="flex items-center gap-4">
+                <span className={`grid size-8 place-items-center border ${i < 3 ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+                  {i < 3 ? <Check className="size-4" /> : i + 1}
+                </span>
+                <div>
+                  <b>{step}</b>
+                  <p className="text-xs text-muted-foreground">{i < 3 ? "Completed" : "Awaiting update"}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <aside className="space-y-4">
+          <div className="border bg-card p-5">
+            <h2 className="font-bold">Order summary</h2>
+            <div className="mt-4 flex justify-between text-sm">
+              <span>{order.items.length} products</span>
+              <b>{money(order.total)}</b>
+            </div>
+            <Button className="mt-5 w-full" variant="outline">Download invoice</Button>
+          </div>
+          <div className="border bg-card p-5">
+            <h2 className="flex items-center gap-2 font-bold">
+              <LocationOn className="size-4 text-primary" />
+              Delivery address
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              <strong>{retailerProfile.businessName}</strong> ({retailerProfile.ownerName})<br />
+              {retailerProfile.address}, {retailerProfile.city}, {retailerProfile.state} {retailerProfile.pincode}<br />
+              {retailerProfile.phone}
+            </p>
+          </div>
+        </aside>
+      </div>
+      <section className="mt-8 border bg-card p-6">
+        <h2 className="text-xl font-bold">Products in this order</h2>
+        <div className="mt-4 divide-y">
+          {order.items.map((item) => {
+            const p = getProduct(item.productId);
+            return (
+              <div key={item.productId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 py-4">
+                <div>
+                  <b>{p.name}</b>
+                  <p className="mt-1 text-sm text-muted-foreground">{item.quantity} units · {money(p.price)} each</p>
+                </div>
+                <strong className="text-primary sm:text-ink">{money(p.price * item.quantity)}</strong>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </main>
+  );
+}
 
 export function CartPage() {
   const { cart } = useStore();
@@ -33,10 +232,7 @@ export function CartPage() {
     return result;
   }, {});
 
-  const total = cart.reduce(
-    (sum, line) => sum + getProduct(line.productId).price * line.quantity,
-    0
-  );
+  const total = cart.reduce((sum, line) => sum + getProduct(line.productId).price * line.quantity, 0);
   const savings = cart.reduce((sum, line) => {
     const product = getProduct(line.productId);
     return sum + Math.max(0, product.mrp - product.price) * line.quantity;
@@ -46,8 +242,7 @@ export function CartPage() {
 
   return (
     <main className="pb-16 sm:pb-20">
-      {/* Banner Header */}
-      <section className="border-b border-primary/10 bg-gradient-to-br from-canvas via-background to-primary/[0.045] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2">
+      <section className="border-b border-primary/10 bg-gradient-to-br from-canvas via-background to-primary/[0.045]">
         <div className="shell py-12 sm:py-16">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="max-w-2xl">
@@ -55,9 +250,7 @@ export function CartPage() {
                 YOUR CART
               </span>
               <div className="mt-3 flex flex-wrap items-baseline gap-3">
-                <h1 className="text-3xl font-black text-ink sm:text-4xl tracking-tight">
-                  Shopping Cart
-                </h1>
+                <h1 className="text-3xl font-black text-ink sm:text-4xl tracking-tight">Shopping Cart</h1>
                 <span className="rounded-full bg-secondary px-3 py-1 text-xs font-extrabold text-secondary-foreground border border-border/80">
                   {itemCount} {itemCount === 1 ? "item" : "items"}
                 </span>
@@ -65,8 +258,6 @@ export function CartPage() {
               <p className="mt-2.5 text-base text-muted-foreground">
                 Review your items before checkout. Orders are split per wholesaler for direct fulfillment.
               </p>
-
-              {/* Informative summary stat inline inside banner */}
               {cart.length > 0 && (
                 <div className="mt-5 flex flex-wrap items-center gap-3 text-xs">
                   <span className="inline-flex items-center gap-1.5 rounded-xl bg-card border border-border/80 px-3.5 py-2 font-bold text-ink shadow-2xs">
@@ -82,14 +273,13 @@ export function CartPage() {
               )}
             </div>
 
-            {/* Reassurance / Trust Badge Strip */}
             <div className="grid gap-2.5 rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs shrink-0 max-w-xs text-xs">
               <div className="flex items-center gap-2.5">
                 <Lock className="size-4 text-primary shrink-0" />
                 <span className="font-bold text-ink">Secure wholesale checkout</span>
               </div>
               <div className="flex items-center gap-2.5">
-                <VerifiedUser className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <VerifiedUser className="size-4 text-emerald-600 shrink-0" />
                 <span className="text-muted-foreground">Verified suppliers only</span>
               </div>
               <div className="flex items-center gap-2.5">
@@ -102,7 +292,6 @@ export function CartPage() {
       </section>
 
       <div className="shell">
-        {/* Empty Cart State or Cart Items Grid */}
         {cart.length === 0 ? (
           <section className="mt-10 grid min-h-[420px] place-items-center rounded-2xl border border-dashed border-border/80 bg-card/60 p-8 text-center shadow-xs">
             <div className="max-w-md">
@@ -114,10 +303,10 @@ export function CartPage() {
                 Add products from your connected wholesalers to get started.
               </p>
               <div className="mt-8 flex flex-wrap justify-center gap-4">
-                <Button asChild size="lg" className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 px-8 font-bold shadow-md transition-all hover:-translate-y-0.5">
+                <Button asChild size="lg" className="rounded-xl bg-primary font-bold shadow-md">
                   <Link to="/products">Browse Products</Link>
                 </Button>
-                <Button asChild size="lg" variant="outline" className="rounded-xl px-6 font-semibold">
+                <Button asChild size="lg" variant="outline" className="rounded-xl font-semibold">
                   <Link to="/wholesalers">View Wholesalers</Link>
                 </Button>
               </div>
@@ -125,38 +314,26 @@ export function CartPage() {
           </section>
         ) : (
           <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1.85fr)_minmax(320px,1fr)] lg:gap-10">
-            {/* LEFT column (~65%): Cart items list grouped by wholesaler */}
             <section className="space-y-8">
               {Object.entries(groups).map(([wholesalerId, lines]) => {
                 const wholesaler = getWholesaler(wholesalerId);
-                const groupTotal = lines.reduce(
-                  (sum, line) => sum + getProduct(line.productId).price * line.quantity,
-                  0
-                );
+                const groupTotal = lines.reduce((sum, line) => sum + getProduct(line.productId).price * line.quantity, 0);
 
                 return (
-                  <article
-                    key={wholesalerId}
-                    className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all duration-300 hover:shadow-md"
-                  >
-                    {/* Wholesaler Group Header */}
+                  <article key={wholesalerId} className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
                     <header className="flex flex-wrap items-center justify-between gap-4 border-b border-border/70 bg-canvas/50 px-6 py-4.5 sm:px-7">
                       <div className="flex items-center gap-3.5">
-                        <div className="grid size-11 place-items-center rounded-xl bg-gradient-to-br from-primary/15 to-ink/20 text-sm font-black text-primary border border-primary/20 shadow-2xs">
+                        <div className="grid size-11 place-items-center rounded-xl bg-gradient-to-br from-primary/15 to-ink/20 text-sm font-black text-primary border border-primary/20">
                           {wholesaler.initials}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <Link
-                              to="/wholesalers/$wholesalerId"
-                              params={{ wholesalerId: wholesaler.id }}
-                              className="font-black text-ink transition-colors hover:text-primary sm:text-lg"
-                            >
+                            <Link to="/wholesalers/$wholesalerId" params={{ wholesalerId: wholesaler.id }} className="font-black text-ink hover:text-primary sm:text-lg">
                               {wholesaler.name}
                             </Link>
                             {wholesaler.verified && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                                <Verified className="size-3 text-emerald-600 dark:text-emerald-400" />
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                                <Verified className="size-3 text-emerald-600" />
                                 Verified
                               </span>
                             )}
@@ -168,21 +345,14 @@ export function CartPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="rounded-full bg-secondary px-3.5 py-1 text-xs font-bold text-secondary-foreground border border-border/60">
-                          {lines.length} {lines.length === 1 ? "item" : "items"} ({money(groupTotal)})
-                        </span>
-                      </div>
+                      <span className="rounded-full bg-secondary px-3.5 py-1 text-xs font-bold text-secondary-foreground border border-border/60">
+                        {lines.length} {lines.length === 1 ? "item" : "items"} ({money(groupTotal)})
+                      </span>
                     </header>
 
-                    {/* Wholesaler Items List */}
                     <div className="px-6 sm:px-7">
                       {lines.map((line) => (
-                        <CartItem
-                          key={line.productId}
-                          product={getProduct(line.productId)}
-                          quantity={line.quantity}
-                        />
+                        <CartItem key={line.productId} product={getProduct(line.productId)} quantity={line.quantity} />
                       ))}
                     </div>
                   </article>
@@ -190,7 +360,6 @@ export function CartPage() {
               })}
             </section>
 
-            {/* RIGHT column (~35%): Order Summary Card */}
             <aside className="h-fit rounded-2xl border border-border/80 bg-card p-6 sm:p-7 shadow-sm lg:sticky lg:top-24 space-y-6">
               <div>
                 <div className="flex items-center justify-between">
@@ -199,9 +368,7 @@ export function CartPage() {
                     {wholesalerCount} {wholesalerCount === 1 ? "Wholesaler" : "Wholesalers"}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Orders are split per wholesaler for direct fulfillment
-                </p>
+                <p className="mt-1 text-xs text-muted-foreground">Orders are split per wholesaler for direct fulfillment</p>
               </div>
 
               <div className="space-y-4 text-sm border-t border-border/70 pt-5">
@@ -211,21 +378,13 @@ export function CartPage() {
                 </div>
                 <div className="flex justify-between gap-4">
                   <span className="text-muted-foreground">Estimated delivery</span>
-                  <span className="text-right font-semibold text-emerald-600 dark:text-emerald-400">
-                    Confirmed by each wholesaler
-                  </span>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Taxes & GST</span>
-                  <span className="text-foreground/80 font-medium">Included where applicable</span>
+                  <span className="text-right font-semibold text-emerald-600">Confirmed by each wholesaler</span>
                 </div>
               </div>
 
               {savings > 0 && (
-                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/25 px-4 py-3 text-sm font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-3">
-                  <span className="grid size-6 place-items-center rounded-full bg-emerald-600 text-white font-black text-xs shrink-0">
-                    %
-                  </span>
+                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/25 px-4 py-3 text-sm font-bold text-emerald-700 flex items-center gap-3">
+                  <span className="grid size-6 place-items-center rounded-full bg-emerald-600 text-white font-black text-xs shrink-0">%</span>
                   <span>You’re saving {money(savings)} on this order</span>
                 </div>
               )}
@@ -236,30 +395,13 @@ export function CartPage() {
                     <span className="text-lg font-extrabold text-ink block">Total</span>
                     <span className="text-xs text-muted-foreground">All items & taxes included</span>
                   </div>
-                  <strong className="text-2xl sm:text-3xl font-black text-primary tracking-tight transition-all">
-                    {money(total)}
-                  </strong>
+                  <strong className="text-2xl sm:text-3xl font-black text-primary">{money(total)}</strong>
                 </div>
               </div>
 
-              <Button
-                asChild
-                className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg h-12 text-base font-extrabold transition-all duration-200 active:scale-[0.98]"
-                size="lg"
-              >
-                <Link to="/checkout" className="flex items-center justify-center gap-2">
-                  Proceed to Checkout
-                </Link>
+              <Button asChild className="w-full rounded-xl bg-primary text-primary-foreground h-12 text-base font-extrabold" size="lg">
+                <Link to="/checkout" className="flex items-center justify-center gap-2">Proceed to Checkout</Link>
               </Button>
-
-              <div className="rounded-xl bg-canvas/80 border border-border/60 p-3.5 text-center">
-                <p className="flex items-start justify-center gap-2 text-xs leading-relaxed text-muted-foreground">
-                  <Lock className="mt-0.5 size-4 shrink-0 text-primary" />
-                  <span>
-                    <strong>Secure checkout</strong> · Prices confirmed after wholesaler approval
-                  </span>
-                </p>
-              </div>
             </aside>
           </div>
         )}
@@ -268,7 +410,77 @@ export function CartPage() {
   );
 }
 
-export function CheckoutPage() { const { cart }=useStore(); const [placed,setPlaced]=useState(false); const total=cart.reduce((sum,line)=>sum+getProduct(line.productId).price*line.quantity,0); if(placed)return <main className="shell py-16"><div className="mx-auto max-w-xl border bg-card p-8 text-center"><span className="mx-auto grid size-14 place-items-center bg-success text-success-foreground"><Check/></span><h1 className="mt-5 text-3xl font-extrabold text-ink">Order placed successfully</h1><p className="mt-3 text-muted-foreground">Your order has been split into separate requests for each wholesaler.</p><div className="mt-6 grid gap-2 text-left">{[...new Set(cart.map(line=>getWholesaler(getProduct(line.productId).wholesalerId).name))].map((name,i)=><div key={name} className="flex justify-between border p-3 text-sm"><span>{name}</span><b>NX-2609{18+i}</b></div>)}</div><Button asChild className="mt-6"><Link to="/orders">View orders</Link></Button></div></main>; return <main className="shell py-10"><h1 className="text-3xl font-extrabold text-ink">Checkout</h1><p className="mt-2 text-muted-foreground">Complete your delivery details and review the separated wholesaler orders.</p><div className="mt-8 grid gap-8 lg:grid-cols-[1fr_360px]"><section className="space-y-5"><div className="border bg-card p-6"><h2 className="text-xl font-bold">Delivery address</h2><div className="mt-4 border border-primary bg-brand-soft p-4"><b>{primaryAddress.name}</b><p className="mt-1 text-sm text-muted-foreground">{primaryAddress.line}<br/>{primaryAddress.phone}</p></div><Button variant="outline" className="mt-4">Choose another address</Button></div><div className="border bg-card p-6"><h2 className="text-xl font-bold">Payment method</h2><label className="mt-4 flex items-start gap-3 border p-4"><input type="radio" defaultChecked name="payment"/><span><b>Pay on delivery</b><span className="mt-1 block text-sm text-muted-foreground">Available for approved retailer accounts</span></span></label><label className="mt-3 flex items-start gap-3 border p-4"><input type="radio" name="payment"/><span><b>Bank transfer</b><span className="mt-1 block text-sm text-muted-foreground">Instructions will be shared after confirmation</span></span></label></div></section><aside className="h-fit border bg-card p-6"><h2 className="text-xl font-bold">Order summary</h2><div className="mt-5 space-y-3">{cart.map(line=>{const p=getProduct(line.productId);return <div key={line.productId} className="flex justify-between gap-4 text-sm"><span>{p.name} × {line.quantity}</span><b>{money(p.price*line.quantity)}</b></div>})}</div><div className="mt-5 flex justify-between border-t pt-5 text-lg"><b>Total</b><strong>{money(total)}</strong></div><Button className="mt-6 w-full" size="lg" onClick={()=>setPlaced(true)}>Place order</Button><p className="mt-3 text-center text-xs text-muted-foreground">Each wholesaler will confirm and fulfil their part separately.</p></aside></div></main> }
+export function CheckoutPage() {
+  const { cart, retailerProfile, placeOrder } = useStore();
+  const [placed, setPlaced] = useState(false);
+  const total = cart.reduce((sum, line) => sum + getProduct(line.productId).price * line.quantity, 0);
+
+  if (placed) {
+    return (
+      <main className="shell py-16">
+        <div className="mx-auto max-w-xl border bg-card p-8 text-center">
+          <span className="mx-auto grid size-14 place-items-center bg-success text-success-foreground"><Check /></span>
+          <h1 className="mt-5 text-3xl font-extrabold text-ink">Order placed successfully</h1>
+          <p className="mt-3 text-muted-foreground">Your order has been split into separate requests for each wholesaler.</p>
+          <Button asChild className="mt-6"><Link to="/orders">View orders</Link></Button>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="shell py-10">
+      <h1 className="text-3xl font-extrabold text-ink">Checkout</h1>
+      <p className="mt-2 text-muted-foreground">Complete your delivery details and review the separated wholesaler orders.</p>
+      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_360px]">
+        <section className="space-y-5">
+          <div className="border bg-card p-6">
+            <h2 className="text-xl font-bold">Delivery address</h2>
+            <div className="mt-4 border border-primary bg-brand-soft p-4">
+              <b>{retailerProfile.businessName}</b>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {retailerProfile.ownerName}<br />
+                {retailerProfile.address}, {retailerProfile.city}, {retailerProfile.state} {retailerProfile.pincode}<br />
+                {retailerProfile.phone}
+              </p>
+            </div>
+          </div>
+          <div className="border bg-card p-6">
+            <h2 className="text-xl font-bold">Payment method</h2>
+            <label className="mt-4 flex items-start gap-3 border p-4">
+              <input type="radio" defaultChecked name="payment" />
+              <span>
+                <b>Pay on delivery</b>
+                <span className="mt-1 block text-sm text-muted-foreground">Available for approved retailer accounts</span>
+              </span>
+            </label>
+          </div>
+        </section>
+        <aside className="h-fit border bg-card p-6">
+          <h2 className="text-xl font-bold">Order summary</h2>
+          <div className="mt-5 space-y-3">
+            {cart.map((line) => {
+              const p = getProduct(line.productId);
+              return (
+                <div key={line.productId} className="flex justify-between gap-4 text-sm">
+                  <span>{p.name} × {line.quantity}</span>
+                  <b>{money(p.price * line.quantity)}</b>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-5 flex justify-between border-t pt-5 text-lg">
+            <b>Total</b>
+            <strong>{money(total)}</strong>
+          </div>
+          <Button className="mt-6 w-full" size="lg" onClick={() => { placeOrder(); setPlaced(true); }}>
+            Place order
+          </Button>
+        </aside>
+      </div>
+    </main>
+  );
+}
 
 export function WishlistPage() {
   const { wishlist } = useStore();
@@ -277,8 +489,7 @@ export function WishlistPage() {
 
   return (
     <main className="pb-16 sm:pb-20">
-      {/* Banner Header */}
-      <section className="border-b border-primary/10 bg-gradient-to-br from-canvas via-background to-primary/[0.045] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2">
+      <section className="border-b border-primary/10 bg-gradient-to-br from-canvas via-background to-primary/[0.045]">
         <div className="shell py-12 sm:py-16">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="max-w-2xl">
@@ -286,9 +497,7 @@ export function WishlistPage() {
                 SAVED FOR LATER
               </span>
               <div className="mt-3 flex flex-wrap items-baseline gap-3">
-                <h1 className="text-3xl font-black text-ink sm:text-4xl tracking-tight">
-                  Your Wishlist
-                </h1>
+                <h1 className="text-3xl font-black text-ink sm:text-4xl tracking-tight">Your Wishlist</h1>
                 <span className="rounded-full bg-secondary px-3 py-1 text-xs font-extrabold text-secondary-foreground border border-border/80">
                   {saved.length} {saved.length === 1 ? "item" : "items"}
                 </span>
@@ -296,41 +505,33 @@ export function WishlistPage() {
               <p className="mt-2.5 text-base text-muted-foreground">
                 Products saved for your next store restock. Access pricing and stock anytime.
               </p>
-
-              {/* Highlighted Stat: Total estimated value */}
               {saved.length > 0 && (
                 <div className="mt-5 flex flex-wrap items-center gap-3">
-                  <div className="inline-flex items-center gap-2 rounded-xl bg-card border border-border/80 px-4 py-2 text-xs shadow-2xs">
+                  <div className="inline-flex items-center gap-2 rounded-xl bg-card border border-border/80 px-4 py-2 text-xs">
                     <span className="text-muted-foreground font-medium">Total estimated value:</span>
                     <strong className="text-sm font-black text-primary">{money(totalValue)}</strong>
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    Inclusive of applicable wholesale trade rates
-                  </span>
                 </div>
               )}
             </div>
-
-            {/* Stylized Icon Graphic */}
-            <div className="hidden md:grid size-24 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-ink/10 text-primary border border-primary/20 shadow-xs">
+            <div className="hidden md:grid size-24 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-ink/10 text-primary border border-primary/20">
               <Favorite className="size-12 fill-primary text-primary" />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Main Content */}
       <div className="shell mt-10">
         {saved.length ? (
           <ProductGrid products={saved} premium />
         ) : (
-          <section className="grid min-h-96 place-items-center rounded-2xl border border-dashed border-border/80 bg-canvas/60 p-8 text-center shadow-2xs">
+          <section className="grid min-h-96 place-items-center rounded-2xl border border-dashed border-border/80 bg-canvas/60 p-8 text-center">
             <div>
               <span className="mx-auto grid size-16 place-items-center rounded-full bg-primary/10 text-primary">
                 <FavoriteBorder className="size-8" />
               </span>
               <h2 className="mt-5 text-2xl font-extrabold text-ink">Your wishlist is empty</h2>
-              <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+              <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
                 Save products you want to reorder later by clicking the heart icon on any product card.
               </p>
               <Button asChild className="mt-6 rounded-xl font-bold">
@@ -345,18 +546,11 @@ export function WishlistPage() {
 }
 
 export function NotificationsPage() {
-  const { markRead, unread } = useStore();
-  const notificationsList = [
-    { title: "Order NX-240902 has shipped", body: "Gupta Wholesale Co. expects delivery by 20 Sep.", time: "12 min ago", unread: true },
-    { title: "Access request approved", body: "You can now shop the full Paperlane Supply House catalogue.", time: "2 hours ago", unread: true },
-    { title: "Price drop on your wishlist", body: "Classic Electric Kettle is now ₹899 per unit.", time: "Yesterday", unread: true },
-    { title: "Order delivered", body: "Your Metro Cash Network order was delivered successfully.", time: "2 days ago", unread: false },
-  ];
+  const { notifications, markRead, unread } = useStore();
 
   return (
     <main className="pb-16 sm:pb-20">
-      {/* Banner Header */}
-      <section className="border-b border-primary/10 bg-gradient-to-br from-canvas via-background to-primary/[0.045] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2">
+      <section className="border-b border-primary/10 bg-gradient-to-br from-canvas via-background to-primary/[0.045]">
         <div className="shell py-12 sm:py-16">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="max-w-2xl">
@@ -364,11 +558,9 @@ export function NotificationsPage() {
                 NOTIFICATIONS
               </span>
               <div className="mt-3 flex flex-wrap items-baseline gap-3">
-                <h1 className="text-3xl font-black text-ink sm:text-4xl tracking-tight">
-                  Stay Updated
-                </h1>
+                <h1 className="text-3xl font-black text-ink sm:text-4xl tracking-tight">Stay Updated</h1>
                 {unread > 0 && (
-                  <span className="rounded-full bg-primary text-primary-foreground px-3 py-1 text-xs font-extrabold shadow-2xs">
+                  <span className="rounded-full bg-primary text-primary-foreground px-3 py-1 text-xs font-extrabold">
                     {unread} new {unread === 1 ? "notification" : "notifications"}
                   </span>
                 )}
@@ -383,8 +575,7 @@ export function NotificationsPage() {
               </div>
             </div>
 
-            {/* Stylized Bell Icon Graphic */}
-            <div className="hidden md:grid size-24 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-ink/10 text-primary border border-primary/20 shadow-xs">
+            <div className="hidden md:grid size-24 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-ink/10 text-primary border border-primary/20">
               <Notifications className="size-12 text-primary" />
             </div>
           </div>
@@ -393,37 +584,310 @@ export function NotificationsPage() {
 
       <div className="shell mt-8">
         <div className="grid gap-3 max-w-3xl">
-          {notificationsList.map((n) => (
-            <div
-              key={n.title}
-              className={`flex gap-4 rounded-2xl border p-5 transition-all ${
-                n.unread ? "bg-card border-primary/30 shadow-2xs" : "bg-canvas/60 border-border/70"
-              }`}
-            >
-              <span
-                className={`mt-1.5 size-2.5 shrink-0 rounded-full ${
-                  n.unread ? "bg-primary shadow-2xs" : "bg-muted-foreground/30"
+          {notifications.length > 0 ? (
+            notifications.map((n) => (
+              <div
+                key={n.id}
+                className={`flex gap-4 rounded-2xl border p-5 transition-all ${
+                  n.unread ? "bg-card border-primary/30 shadow-2xs" : "bg-canvas/60 border-border/70"
                 }`}
-              />
-              <div className="flex-1">
-                <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 sm:gap-3">
-                  <b className="font-extrabold text-ink text-base">{n.title}</b>
-                  <span className="text-xs text-muted-foreground shrink-0">{n.time}</span>
+              >
+                <span className={`mt-1.5 size-2.5 shrink-0 rounded-full ${n.unread ? "bg-primary" : "bg-muted-foreground/30"}`} />
+                <div className="flex-1">
+                  <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 sm:gap-3">
+                    <b className="font-extrabold text-ink text-base">{n.title}</b>
+                    <span className="text-xs text-muted-foreground shrink-0">{n.time}</span>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{n.body}</p>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{n.body}</p>
               </div>
+            ))
+          ) : (
+            <div className="p-8 text-center text-sm text-muted-foreground border border-dashed rounded-2xl">
+              No notifications yet.
             </div>
-          ))}
+          )}
         </div>
       </div>
     </main>
   );
 }
 
-export function ProfilePage() { return <main className="shell py-10"><h1 className="text-3xl font-extrabold text-ink">Business profile</h1><p className="mt-2 text-muted-foreground">Keep your retailer details ready for every wholesale order.</p><div className="mt-8 grid gap-8 lg:grid-cols-[1fr_300px]"><section className="border bg-card p-6"><h2 className="text-xl font-bold">Business information</h2><div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">Business name<Input className="mt-2" defaultValue="Kapoor General Store"/></label><label className="text-sm font-semibold">GST number<Input className="mt-2" defaultValue="06AABCK1234M1ZP"/></label><label className="text-sm font-semibold">Business type<Input className="mt-2" defaultValue="Independent retailer"/></label><label className="text-sm font-semibold">Owner name<Input className="mt-2" defaultValue="Amit Kapoor"/></label><label className="text-sm font-semibold sm:col-span-2">Email address<Input className="mt-2" defaultValue="amit@kapoorgeneral.example"/></label></div><Button className="mt-6">Save changes</Button></section><aside className="border bg-card p-6"><VerifiedUser className="size-7 text-success"/><h2 className="mt-4 font-bold">Verified retailer account</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">Your business information is ready to share with connected wholesalers.</p></aside></div></main> }
+export function ProfilePage() {
+  const { retailerProfile, saveProfile } = useStore();
+  const [form, setForm] = useState<RetailerProfile>(retailerProfile);
 
-export function AddressesPage() { return <main className="shell py-10"><div className="flex items-end justify-between gap-4"><div><h1 className="text-3xl font-extrabold text-ink">Delivery addresses</h1><p className="mt-2 text-muted-foreground">Choose where your wholesale orders should arrive.</p></div><Button>Add address</Button></div><div className="mt-8 grid gap-4 md:grid-cols-2">{addresses.map(address=><div key={address.id} className="border bg-card p-6"><div className="flex items-center justify-between"><div className="flex items-center gap-2 font-bold"><LocationOn className="size-4 text-primary"/>{address.label}</div>{address.primary&&<Badge variant="secondary">Primary</Badge>}</div><h2 className="mt-5 font-bold">{address.name}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{address.line}<br/>{address.phone}</p><div className="mt-5 flex gap-2"><Button variant="outline" size="sm">Edit</Button><Button variant="ghost" size="sm">Remove</Button></div></div>)}</div></main> }
+  useEffect(() => {
+    setForm(retailerProfile);
+  }, [retailerProfile]);
 
-export function SettingsPage() { return <main className="shell py-10"><h1 className="text-3xl font-extrabold text-ink">Settings</h1><p className="mt-2 text-muted-foreground">Manage how NEXORA keeps you updated.</p><div className="mt-8 max-w-2xl border bg-card p-6"><h2 className="text-xl font-bold">Notifications</h2>{[["Order updates","Get shipping and delivery updates"],["Price alerts","Know when saved products change price"],["Wholesaler messages","Receive catalogue and access updates"]].map(([title,body],i)=><label key={title} className="flex items-center justify-between gap-4 border-b py-5 last:border-0"><span><b>{title}</b><span className="mt-1 block text-sm text-muted-foreground">{body}</span></span><input type="checkbox" defaultChecked={i<2}/></label>)}<Button className="mt-5">Save preferences</Button></div></main> }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveProfile(form);
+  };
 
-export function AuthPage({ mode }: { mode: "login" | "register" | "forgot" }) { const title=mode==="login"?"Welcome back":mode==="register"?"Create your retailer account":"Reset your password"; return <main className="grid min-h-[calc(100vh-120px)] place-items-center bg-canvas px-4 py-12"><section className="w-full max-w-md border bg-card p-7 shadow-sm"><div className="text-center"><span className="mx-auto grid size-11 place-items-center bg-primary font-extrabold text-primary-foreground">N</span><h1 className="mt-5 text-2xl font-extrabold text-ink">{title}</h1><p className="mt-2 text-sm text-muted-foreground">{mode==="register"?"Join thousands of retailers sourcing better.":mode==="forgot"?"We’ll send a reset link to your account email.":"Sign in to your NEXORA shopping workspace."}</p></div><form className="mt-7 grid gap-4" onSubmit={e=>e.preventDefault()}>{mode==="register"&&<label className="text-sm font-semibold">Business name<Input className="mt-2" placeholder="Your store name"/></label>}<label className="text-sm font-semibold">Email address<Input className="mt-2" type="email" placeholder="you@business.com"/></label>{mode!=="forgot"&&<label className="text-sm font-semibold">Password<Input className="mt-2" type="password" placeholder="Enter your password"/></label>}<Button type="submit" size="lg" className="mt-2">{mode==="login"?"Sign in":mode==="register"?"Create account":"Send reset link"}</Button></form><div className="mt-6 text-center text-sm text-muted-foreground">{mode==="login"?<><Link className="text-primary hover:underline" to="/forgot-password">Forgot password?</Link><p className="mt-3">New to NEXORA? <Link className="font-semibold text-primary" to="/register">Create an account</Link></p></>:<Link className="text-primary hover:underline" to="/login">Back to sign in</Link>}</div></section></main> }
+  return (
+    <main className="shell py-10">
+      <h1 className="text-3xl font-extrabold text-ink">Business profile</h1>
+      <p className="mt-2 text-muted-foreground">Keep your retailer details ready for every wholesale order.</p>
+      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_300px]">
+        <section className="border bg-card p-6">
+          <h2 className="text-xl font-bold">Business information</h2>
+          <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
+            <label className="text-sm font-semibold">
+              Business name
+              <Input
+                className="mt-2"
+                value={form.businessName}
+                onChange={(e) => setForm({ ...form, businessName: e.target.value })}
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              GST number
+              <Input
+                className="mt-2"
+                value={form.gstNumber}
+                onChange={(e) => setForm({ ...form, gstNumber: e.target.value })}
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              Business type
+              <Input
+                className="mt-2"
+                value={form.businessType}
+                onChange={(e) => setForm({ ...form, businessType: e.target.value })}
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              Owner name
+              <Input
+                className="mt-2"
+                value={form.ownerName}
+                onChange={(e) => setForm({ ...form, ownerName: e.target.value })}
+              />
+            </label>
+            <label className="text-sm font-semibold sm:col-span-2">
+              Email address
+              <Input
+                className="mt-2"
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              Mobile number
+              <Input
+                className="mt-2"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              City
+              <Input
+                className="mt-2"
+                value={form.city}
+                onChange={(e) => setForm({ ...form, city: e.target.value })}
+              />
+            </label>
+            <label className="text-sm font-semibold sm:col-span-2">
+              Shop / Godown address
+              <Input
+                className="mt-2"
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+              />
+            </label>
+            <div className="sm:col-span-2">
+              <Button type="submit" className="mt-2">Save changes</Button>
+            </div>
+          </form>
+        </section>
+        <aside className="border bg-card p-6">
+          <VerifiedUser className="size-7 text-success" />
+          <h2 className="mt-4 font-bold">Verified retailer account</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Your business information is ready to share with connected wholesalers.
+          </p>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+export function AddressesPage() {
+  const { retailerProfile } = useStore();
+
+  return (
+    <main className="shell py-10">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-ink">Delivery addresses</h1>
+          <p className="mt-2 text-muted-foreground">Choose where your wholesale orders should arrive.</p>
+        </div>
+        <Button>Add address</Button>
+      </div>
+      <div className="mt-8 grid gap-4 md:grid-cols-2">
+        <div className="border bg-card p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-bold">
+              <LocationOn className="size-4 text-primary" /> Main Store Address
+            </div>
+            <Badge variant="secondary">Primary</Badge>
+          </div>
+          <h2 className="mt-5 font-bold">{retailerProfile.businessName}</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {retailerProfile.address}, {retailerProfile.city}, {retailerProfile.state} {retailerProfile.pincode}<br />
+            Phone: {retailerProfile.phone}
+          </p>
+          <div className="mt-5 flex gap-2">
+            <Button variant="outline" size="sm">Edit</Button>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export function SettingsPage() {
+  return (
+    <main className="shell py-10">
+      <h1 className="text-3xl font-extrabold text-ink">Settings</h1>
+      <p className="mt-2 text-muted-foreground">Manage how NEXORA keeps you updated.</p>
+      <div className="mt-8 max-w-2xl border bg-card p-6">
+        <h2 className="text-xl font-bold">Notifications</h2>
+        {[
+          ["Order updates", "Get shipping and delivery updates"],
+          ["Price alerts", "Know when saved products change price"],
+          ["Wholesaler messages", "Receive catalogue and access updates"],
+        ].map(([title, body], i) => (
+          <label key={title} className="flex items-center justify-between gap-4 border-b py-5 last:border-0">
+            <span>
+              <b>{title}</b>
+              <span className="mt-1 block text-sm text-muted-foreground">{body}</span>
+            </span>
+            <input type="checkbox" defaultChecked={i < 2} />
+          </label>
+        ))}
+        <Button className="mt-5">Save preferences</Button>
+      </div>
+    </main>
+  );
+}
+
+export function AuthPage({ mode }: { mode: "login" | "register" | "forgot" }) {
+  const navigate = useNavigate();
+  const { login } = useStore();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const title = mode === "login" ? "Welcome back" : mode === "register" ? "Create your retailer account" : "Reset your password";
+
+  const handleAuthSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mode === "login") {
+      login(email || "amit@kapoorgeneral.example");
+      navigate({ to: "/dashboard" });
+    }
+  };
+
+  const handleQuickLogin = (demoEmail: string) => {
+    setEmail(demoEmail);
+    login(demoEmail);
+    navigate({ to: "/dashboard" });
+  };
+
+  return (
+    <main className="grid min-h-[calc(100vh-120px)] place-items-center bg-canvas px-4 py-12">
+      <section className="w-full max-w-md border bg-card p-7 shadow-sm rounded-2xl">
+        <div className="text-center">
+          <span className="mx-auto grid size-11 place-items-center bg-primary font-extrabold text-primary-foreground rounded-xl">
+            N
+          </span>
+          <h1 className="mt-5 text-2xl font-extrabold text-ink">{title}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {mode === "register" ? "Join thousands of retailers sourcing better." : mode === "forgot" ? "We’ll send a reset link to your account email." : "Sign in to your NEXORA shopping workspace."}
+          </p>
+        </div>
+
+        <form className="mt-7 grid gap-4" onSubmit={handleAuthSubmit}>
+          <label className="text-sm font-semibold">
+            Email address
+            <Input
+              className="mt-2"
+              type="email"
+              placeholder="you@business.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </label>
+          {mode !== "forgot" && (
+            <label className="text-sm font-semibold">
+              Password
+              <Input
+                className="mt-2"
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </label>
+          )}
+          <Button type="submit" size="lg" className="mt-2 rounded-xl font-extrabold">
+            {mode === "login" ? "Sign in" : mode === "register" ? "Create account" : "Send reset link"}
+          </Button>
+        </form>
+
+        {mode === "login" && (
+          <div className="mt-6 border-t pt-5 space-y-3">
+            <p className="text-center text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              Quick Test Account Login
+            </p>
+            <div className="grid gap-2 text-xs">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickLogin("amit@kapoorgeneral.example")}
+                className="justify-between text-left rounded-xl h-auto py-2.5 px-3"
+              >
+                <div>
+                  <b className="block text-ink">Retailer A (Amit Kapoor)</b>
+                  <span className="text-muted-foreground text-[11px]">4 Connected Wholesalers · 9 Orders</span>
+                </div>
+                <ChevronRight className="size-4 text-primary" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickLogin("verma@singh-traders.example")}
+                className="justify-between text-left rounded-xl h-auto py-2.5 px-3"
+              >
+                <div>
+                  <b className="block text-ink">Retailer B (Rajesh Verma)</b>
+                  <span className="text-muted-foreground text-[11px]">2 Connected Wholesalers · 2 Orders</span>
+                </div>
+                <ChevronRight className="size-4 text-primary" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-6 text-center text-sm text-muted-foreground">
+          {mode === "login" ? (
+            <>
+              <Link className="text-primary hover:underline" to="/forgot-password">Forgot password?</Link>
+              <p className="mt-3">New to NEXORA? <Link className="font-semibold text-primary" to="/register">Create an account</Link></p>
+            </>
+          ) : (
+            <Link className="text-primary hover:underline" to="/login">Back to sign in</Link>
+          )}
+        </div>
+      </section>
+    </main>
+  );
+}

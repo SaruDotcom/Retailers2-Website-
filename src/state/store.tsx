@@ -1,16 +1,38 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { defaultRetailerProfile, products, wholesalers, orders as initialOrders, type Order, type Relationship, type RetailerProfile } from "@/data/mock";
+import { products, wholesalers, orders as initialOrders, type Order, type Relationship, type RetailerProfile } from "@/data/mock";
 
-type CartLine = { productId: string; quantity: number };
-type Store = {
+export type NotificationItem = { id: string; title: string; body: string; time: string; unread: boolean };
+export type CartLine = { productId: string; quantity: number };
+
+export type UserSession = {
+  id: string;
+  email: string;
+};
+
+export type UserData = {
+  profile: RetailerProfile;
+  relationships: Record<string, Relationship>;
+  orders: Order[];
+  cart: CartLine[];
+  wishlist: string[];
+  recentlyViewed: string[];
+  notifications: NotificationItem[];
+};
+
+export type Store = {
+  currentUser: UserSession | null;
+  isLoggedIn: boolean;
   cart: CartLine[];
   wishlist: string[];
   relationships: Record<string, Relationship>;
   orders: Order[];
   retailerProfile: RetailerProfile;
   unread: number;
+  notifications: NotificationItem[];
   recentlyViewed: string[];
+  login: (email: string, password?: string) => void;
+  logout: () => void;
   addToCart: (id: string, q?: number) => void;
   setQuantity: (id: string, q: number) => void;
   removeCart: (id: string) => void;
@@ -25,59 +47,281 @@ type Store = {
 
 const StoreContext = createContext<Store | undefined>(undefined);
 
-export function StoreProvider({ children }: { children: ReactNode }) {
-  const [cart, setCart] = useState<CartLine[]>([
+// Pre-configured templates for seamless multi-account testing
+const userAProfile: RetailerProfile = {
+  businessName: "Kapoor General Store",
+  ownerName: "Amit Kapoor",
+  phone: "+91 98765 43210",
+  email: "amit@kapoorgeneral.example",
+  gstRegistered: true,
+  gstNumber: "06AABCK1234M1ZP",
+  businessType: "Independent retailer",
+  category: "Grocery & Staples",
+  address: "18 Market Road",
+  city: "Gurugram",
+  state: "Haryana",
+  pincode: "122001",
+};
+
+const userATemplate: UserData = {
+  profile: userAProfile,
+  relationships: {
+    sharma: "Connected",
+    gupta: "Connected",
+    paperlane: "Connected",
+    metro: "Connected",
+    orbit: "Request Pending",
+    northstar: "Request Pending",
+    sunrise: "Request Access",
+    greenway: "Request Access",
+  },
+  orders: initialOrders,
+  cart: [
     { productId: "p2", quantity: 6 },
     { productId: "p7", quantity: 5 },
     { productId: "p11", quantity: 6 },
-  ]);
-  const [wishlist, setWishlist] = useState<string[]>(["p1", "p3", "p17", "p23"]);
-  const [relationships, setRelationships] = useState<Record<string, Relationship>>(() =>
-    Object.fromEntries(wholesalers.map((w) => [w.id, w.relationship]))
-  );
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
-  const [retailerProfile, setRetailerProfile] = useState<RetailerProfile>(defaultRetailerProfile);
-  const [unread, setUnread] = useState(3);
-  const [recentlyViewed, setRecentlyViewed] = useState<string[]>(["p2", "p7", "p11", "p6"]);
+  ],
+  wishlist: ["p1", "p3", "p17", "p23"],
+  recentlyViewed: ["p2", "p7", "p11", "p6"],
+  notifications: [
+    { id: "n1", title: "Order NX-240902 has shipped", body: "Gupta Wholesale Co. expects delivery by 20 Sep.", time: "12 min ago", unread: true },
+    { id: "n2", title: "Access request approved", body: "You can now shop the full Paperlane Supply House catalogue.", time: "2 hours ago", unread: true },
+    { id: "n3", title: "Price drop on your wishlist", body: "Classic Electric Kettle is now ₹899 per unit.", time: "Yesterday", unread: true },
+    { id: "n4", title: "Order delivered", body: "Your Metro Cash Network order was delivered successfully.", time: "2 days ago", unread: false },
+  ],
+};
 
-  useEffect(() => {
-    const raw = window.localStorage.getItem("nexora-store");
-    if (raw) {
-      try {
-        const saved = JSON.parse(raw) as Partial<{
-          cart: CartLine[];
-          wishlist: string[];
-          relationships: Record<string, Relationship>;
-          orders: Order[];
-          retailerProfile: RetailerProfile;
-          recentlyViewed: string[];
-        }>;
-        if (Array.isArray(saved.cart)) setCart(saved.cart);
-        if (Array.isArray(saved.wishlist)) setWishlist(saved.wishlist);
-        if (saved.relationships) setRelationships(saved.relationships);
-        if (Array.isArray(saved.orders)) setOrders(saved.orders);
-        if (saved.retailerProfile) setRetailerProfile(saved.retailerProfile);
-        if (Array.isArray(saved.recentlyViewed)) setRecentlyViewed(saved.recentlyViewed);
-      } catch {}
+const userBProfile: RetailerProfile = {
+  businessName: "Singh & Verma Supermarket",
+  ownerName: "Rajesh Verma",
+  phone: "+91 98123 45678",
+  email: "verma@singh-traders.example",
+  gstRegistered: true,
+  gstNumber: "07AAACV9876L1Z4",
+  businessType: "Supermarket / mini-mart",
+  category: "Beverages",
+  address: "45 Station Road, Connaught Place",
+  city: "New Delhi",
+  state: "Delhi",
+  pincode: "110001",
+};
+
+const userBTemplate: UserData = {
+  profile: userBProfile,
+  relationships: {
+    orbit: "Connected",
+    sunrise: "Connected",
+    greenway: "Request Pending",
+    sharma: "Request Access",
+    gupta: "Request Access",
+    paperlane: "Request Access",
+    metro: "Request Access",
+    northstar: "Request Access",
+  },
+  orders: [
+    {
+      id: "NX-9901",
+      date: "17 Sep 2026",
+      status: "Processing",
+      wholesalerId: "orbit",
+      total: 14200,
+      items: [{ productId: "p1", quantity: 10 }, { productId: "p5", quantity: 8 }],
+    },
+    {
+      id: "NX-9902",
+      date: "10 Sep 2026",
+      status: "Delivered",
+      wholesalerId: "sunrise",
+      total: 8900,
+      items: [{ productId: "p9", quantity: 15 }],
+    },
+  ],
+  cart: [{ productId: "p1", quantity: 4 }],
+  wishlist: ["p9", "p10", "p27"],
+  recentlyViewed: ["p9", "p10"],
+  notifications: [
+    { id: "nb1", title: "Order NX-9901 confirmed by Orbit", body: "Orbit Trade Links has packed your items.", time: "1 hour ago", unread: true },
+  ],
+};
+
+function getNewUserTemplate(email: string, profileInput?: Partial<RetailerProfile>): UserData {
+  const cleanName = email.split("@")[0] ?? "New User";
+  const formattedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+  return {
+    profile: {
+      businessName: profileInput?.businessName || `${formattedName}'s Retail Store`,
+      ownerName: profileInput?.ownerName || formattedName,
+      phone: profileInput?.phone || "+91 90000 00000",
+      email: email,
+      gstRegistered: profileInput?.gstRegistered ?? false,
+      gstNumber: profileInput?.gstNumber || "",
+      businessType: profileInput?.businessType || "Independent retailer",
+      category: profileInput?.category || "Grocery & Staples",
+      address: profileInput?.address || "Main Market Road",
+      city: profileInput?.city || "New Delhi",
+      state: profileInput?.state || "Delhi",
+      pincode: profileInput?.pincode || "110001",
+    },
+    relationships: Object.fromEntries(wholesalers.map((w) => [w.id, "Request Access" as Relationship])),
+    orders: [],
+    cart: [],
+    wishlist: [],
+    recentlyViewed: [],
+    notifications: [
+      { id: "new1", title: "Welcome to NEXORA!", body: "Browse wholesalers by category and send connection requests to unlock trade catalogs.", time: "Just now", unread: true },
+    ],
+  };
+}
+
+function resolveUserTemplate(userId: string, email: string): UserData {
+  const saved = window.localStorage.getItem(`nexora-user-data_${userId}`);
+  if (saved) {
+    try {
+      return JSON.parse(saved) as UserData;
+    } catch {}
+  }
+  if (userId === "user-amit" || email.toLowerCase().includes("amit")) {
+    return userATemplate;
+  }
+  if (userId === "user-verma" || email.toLowerCase().includes("verma")) {
+    return userBTemplate;
+  }
+  return getNewUserTemplate(email);
+}
+
+export function StoreProvider({ children }: { children: ReactNode }) {
+  const [activeUserId, setActiveUserId] = useState<string>(() => {
+    return window.localStorage.getItem("nexora-active-user-id") || "user-amit";
+  });
+
+  const [currentUser, setCurrentUser] = useState<UserSession | null>(() => {
+    const savedEmail = window.localStorage.getItem(`nexora-user-email_${activeUserId}`);
+    if (activeUserId === "user-amit") return { id: "user-amit", email: "amit@kapoorgeneral.example" };
+    if (activeUserId === "user-verma") return { id: "user-verma", email: "verma@singh-traders.example" };
+    return { id: activeUserId, email: savedEmail || `${activeUserId}@retailer.example` };
+  });
+
+  const [userData, setUserData] = useState<UserData>(() => {
+    return resolveUserTemplate(activeUserId, currentUser?.email || "amit@kapoorgeneral.example");
+  });
+
+  // Load user data whenever activeUserId changes
+  const switchUser = (userId: string, email: string, profileInput?: Partial<RetailerProfile>) => {
+    let resolved = resolveUserTemplate(userId, email);
+    if (profileInput) {
+      resolved = { ...resolved, profile: { ...resolved.profile, ...profileInput } };
     }
-  }, []);
+    setActiveUserId(userId);
+    setCurrentUser({ id: userId, email });
+    setUserData(resolved);
 
+    window.localStorage.setItem("nexora-active-user-id", userId);
+    window.localStorage.setItem(`nexora-user-email_${userId}`, email);
+    window.localStorage.setItem(`nexora-user-data_${userId}`, JSON.stringify(resolved));
+  };
+
+  // Sync current user data to localStorage
   useEffect(() => {
-    window.localStorage.setItem(
-      "nexora-store",
-      JSON.stringify({ cart, wishlist, relationships, orders, retailerProfile, recentlyViewed })
-    );
-  }, [cart, wishlist, relationships, orders, retailerProfile, recentlyViewed]);
+    if (!activeUserId) return;
+    window.localStorage.setItem(`nexora-user-data_${activeUserId}`, JSON.stringify(userData));
+  }, [activeUserId, userData]);
+
+  const { cart, wishlist, relationships, orders, profile: retailerProfile, recentlyViewed, notifications } = userData;
+
+  const setCart = (updater: CartLine[] | ((prev: CartLine[]) => CartLine[])) => {
+    setUserData((prev) => ({
+      ...prev,
+      cart: typeof updater === "function" ? updater(prev.cart) : updater,
+    }));
+  };
+
+  const setWishlist = (updater: string[] | ((prev: string[]) => string[])) => {
+    setUserData((prev) => ({
+      ...prev,
+      wishlist: typeof updater === "function" ? updater(prev.wishlist) : updater,
+    }));
+  };
+
+  const setRelationships = (updater: Record<string, Relationship> | ((prev: Record<string, Relationship>) => Record<string, Relationship>)) => {
+    setUserData((prev) => ({
+      ...prev,
+      relationships: typeof updater === "function" ? updater(prev.relationships) : updater,
+    }));
+  };
+
+  const setOrders = (updater: Order[] | ((prev: Order[]) => Order[])) => {
+    setUserData((prev) => ({
+      ...prev,
+      orders: typeof updater === "function" ? updater(prev.orders) : updater,
+    }));
+  };
+
+  const setProfile = (newProfile: RetailerProfile) => {
+    setUserData((prev) => ({
+      ...prev,
+      profile: newProfile,
+    }));
+  };
+
+  const setRecentlyViewed = (updater: string[] | ((prev: string[]) => string[])) => {
+    setUserData((prev) => ({
+      ...prev,
+      recentlyViewed: typeof updater === "function" ? updater(prev.recentlyViewed) : updater,
+    }));
+  };
+
+  const setNotifications = (updater: NotificationItem[] | ((prev: NotificationItem[]) => NotificationItem[])) => {
+    setUserData((prev) => ({
+      ...prev,
+      notifications: typeof updater === "function" ? updater(prev.notifications) : updater,
+    }));
+  };
+
+  const unread = notifications.filter((n) => n.unread).length;
+
+  const login = (email: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    let userId = `user-${cleanEmail.replace(/[^a-z0-9]/g, "")}`;
+    if (cleanEmail.includes("amit")) userId = "user-amit";
+    else if (cleanEmail.includes("verma")) userId = "user-verma";
+
+    switchUser(userId, cleanEmail);
+    const resolved = resolveUserTemplate(userId, cleanEmail);
+    toast.success(`Signed in as ${resolved.profile.ownerName}`);
+  };
+
+  const logout = () => {
+    window.localStorage.removeItem("nexora-active-user-id");
+    const guestId = "guest-" + Date.now();
+    setActiveUserId(guestId);
+    setCurrentUser(null);
+    setUserData(getNewUserTemplate("guest@retailer.example"));
+    toast.success("Signed out successfully");
+  };
+
+  const saveProfile = (profileInput: RetailerProfile) => {
+    let userId = activeUserId;
+    if (!currentUser || activeUserId.startsWith("guest-")) {
+      userId = `user-${profileInput.email.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+    }
+    switchUser(userId, profileInput.email, profileInput);
+    toast.success("Retailer profile saved");
+  };
 
   const value = useMemo<Store>(
     () => ({
+      currentUser,
+      isLoggedIn: currentUser !== null && !activeUserId.startsWith("guest-"),
       cart,
       wishlist,
       relationships,
       orders,
       retailerProfile,
       unread,
+      notifications,
       recentlyViewed,
+      login,
+      logout,
       addToCart: (id, q) => {
         const p = products.find((x) => x.id === id);
         if (!p) return;
@@ -104,10 +348,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setRelationships((r) => ({ ...r, [id]: "Connected" }));
         toast.success("Wholesaler connection approved");
       },
-      saveProfile: (profile) => {
-        setRetailerProfile(profile);
-        toast.success("Retailer profile saved");
-      },
+      saveProfile,
       placeOrder: () => {
         const grouped = cart.reduce<Record<string, CartLine[]>>((result, line) => {
           const product = products.find((item) => item.id === line.productId);
@@ -132,12 +373,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         toast.success(`${created.length} wholesaler order${created.length === 1 ? "" : "s"} placed`);
         return created;
       },
-      markRead: () => setUnread(0),
+      markRead: () =>
+        setNotifications((prev) => prev.map((n) => ({ ...n, unread: false }))),
       addRecentlyViewed: (id) => {
         setRecentlyViewed((prev) => [id, ...prev.filter((x) => x !== id)].slice(0, 12));
       },
     }),
-    [cart, wishlist, relationships, orders, retailerProfile, unread, recentlyViewed]
+    [currentUser, activeUserId, cart, wishlist, relationships, orders, retailerProfile, unread, notifications, recentlyViewed]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
@@ -148,3 +390,4 @@ export const useStore = () => {
   if (!value) throw new Error("StoreProvider missing");
   return value;
 };
+
